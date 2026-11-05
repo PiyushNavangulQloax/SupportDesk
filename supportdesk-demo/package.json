@@ -1,0 +1,13 @@
+{
+  "name": "supportdesk-demo",
+  "version": "1.0.0",
+  "description": "SupportDesk MVC practice demo refactoring",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test tests/ticket.test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
