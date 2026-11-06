@@ -1,0 +1,149 @@
+// ============================================================================
+// SupportDesk Day 8 — Prisma 7 Schema Blueprint
+// Target: PostgreSQL + Prisma ORM 7.10.1
+// Source of Truth: docs/database-design-notes.md
+// ============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  CUSTOMER @map("customer")
+  AGENT    @map("agent")
+  ADMIN    @map("admin")
+
+  @@map("user_role")
+}
+
+enum TicketStatus {
+  OPEN                @map("open")
+  IN_PROGRESS         @map("in_progress")
+  WAITING_ON_CUSTOMER @map("waiting_on_customer")
+  RESOLVED            @map("resolved")
+  CLOSED              @map("closed")
+
+  @@map("ticket_status")
+}
+
+enum TicketPriority {
+  P1 @map("P1")
+  P2 @map("P2")
+  P3 @map("P3")
+  P4 @map("P4")
+
+  @@map("ticket_priority")
+}
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String   @db.VarChar(100)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @db.VarChar(255)
+  role         UserRole @default(CUSTOMER)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  createdTickets  Ticket[]   @relation("TicketCreator")
+  assignedTickets Ticket[]   @relation("TicketAssignee")
+  comments        Comment[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+model Ticket {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String         @db.VarChar(255)
+  description String         @db.Text
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(P3)
+  category    String?        @db.VarChar(100)
+  createdById String         @db.Uuid
+  assigneeId  String?        @db.Uuid
+  slaDueAt    DateTime?      @db.Timestamptz(6)
+  createdAt   DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
+
+  createdBy   User         @relation("TicketCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  assignee    User?        @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  comments    Comment[]
+  attachments Attachment[]
+  ticketTags  TicketTag[]
+
+  @@index([status], name: "tickets_status_idx")
+  @@index([assigneeId], name: "tickets_assignee_idx")
+  @@index([createdById], name: "tickets_created_by_idx")
+  @@map("tickets")
+}
+
+model Comment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId   String   @db.Uuid
+  authorId   String   @db.Uuid
+  body       String   @db.Text
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  author User   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt(sort: Asc)], name: "comments_ticket_created_idx")
+  @@map("comments")
+}
+
+model Tag {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @db.VarChar(50)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  ticketTags TicketTag[]
+
+  @@map("tags")
+}
+
+model TicketTag {
+  ticketId  String   @db.Uuid
+  tagId     String   @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Restrict)
+
+  @@id([ticketId, tagId])
+  @@index([tagId], name: "ticket_tags_tag_idx")
+  @@map("ticket_tags")
+}
+
+model Attachment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId   String   @db.Uuid
+  fileName   String   @db.VarChar(255)
+  storageRef String   @db.VarChar(500)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId], name: "attachments_ticket_idx")
+  @@map("attachments")
+}
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?  @db.Uuid
+  action     String   @db.VarChar(100)
+  targetType String   @db.VarChar(50)
+  targetId   String   @db.VarChar(100)
+  details    Json?    @db.JsonB
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([targetType, targetId], name: "audit_logs_target_idx")
+  @@map("audit_logs")
+}

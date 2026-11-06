@@ -58,3 +58,4 @@ test-results/
 
 # Generated files
 *.tsbuildinfo
+apps/api/src/generated/
