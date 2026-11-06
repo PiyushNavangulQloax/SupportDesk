@@ -1,0 +1,26 @@
+{
+  "name": "supportdesk-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck:seed",
+    "typecheck:seed": "tsc --noEmit prisma/seed.ts --ignoreConfig --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --skipLibCheck",
+    "seed": "tsx prisma/seed.ts",
+    "postinstall": "prisma generate"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/pg": "8.23.1",
+    "prisma": "7.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "dotenv": "18.0.9",
+    "pg": "8.23.1"
+  }
+}
