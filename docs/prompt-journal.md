@@ -368,3 +368,123 @@ Design, model, migrate, seed, and document a robust relational PostgreSQL databa
 - Review and assemble the Day 8 pull request (`feat/day-8-prisma-database` → `main`).
 - Generate the final End of Day (EOD) engineering summary.
 - Staging, committing, and pushing the feature branch upon final user authorization.
+
+---
+
+# Week 2 — Day 3: API Skeleton and MVC Architecture (Day 9)
+
+## 1. Implementation Prompt
+SupportDesk Day 9 — Phase 2: API Implementation:
+Implement API Skeleton and MVC Architecture with Express 5, Prisma 7, PostgreSQL 17, and TypeScript strict mode. Establish standard `{ data, error, meta }` response envelope, Zod validation, request logging, layered separation (Routes → Controllers → Services → Repositories), automated tests, and graceful shutdown without mutating Day 8 seed records.
+
+## 2. Implementation Summary
+- **Branch Setup:** Created feature branch `feat/day-9-api-skeleton` from `feat/day-8-prisma-database`.
+- **Database Startup & Health:** Started PostgreSQL 17 Docker container (`supportdesk-postgres` on port 5433). Validated migration status (`Database schema is up to date!`) and confirmed 50 tickets, 7 users, 75 comments intact.
+- **Dependencies Installed:** Added `express@^5.3.0`, `cors@^2.8.6`, `zod@^4.6.7` to runtime dependencies; added `@types/express`, `@types/cors`, `supertest`, `@types/supertest` to devDependencies.
+- **Config & Core Foundation:**
+  - `src/config/env.ts`: Validates `NODE_ENV`, `PORT`, `DATABASE_URL` via Zod before server starts.
+  - `src/config/database.ts`: Single shared database connection module using `@prisma/adapter-pg` and `pg.Pool`, exporting `prisma` for repositories only.
+  - `src/utils/response.ts`: Standard API envelope builders (`successResponse`, `errorResponse`) enforcing `{ data, error, meta }`.
+  - `src/errors/appError.ts`: Domain error hierarchy (`AppError`, `NotFoundError`, `ValidationError`, `BadRequestError`).
+  - `src/middleware/requestLogger.ts`: Logs HTTP method, URL, status code, and duration without logging headers, credentials, or request bodies.
+  - `src/middleware/validateRequest.ts`: Zod request validation middleware validating `params`, `query`, and `body`.
+  - `src/middleware/errorHandler.ts`: Global error handler mapping domain errors, Zod validation errors, and malformed JSON into the standard envelope while masking raw database errors and stack traces.
+  - `src/middleware/notFound.ts`: Fallback 404 handler with standard error envelope.
+  - `src/routes/health.routes.ts`: `GET /health` endpoint returning system status and uptime without exposing secrets.
+- **MVC Layer for Tickets:**
+  - `src/schemas/ticket.schema.ts`: Request validation schemas for ID params, pagination/filter queries, create body, and update body.
+  - `src/repositories/tickets.repository.ts`: Strictly encapsulates all Prisma operations (`findMany`, `findById`, `create`, `update`, `delete`, `countRelations`).
+  - `src/services/tickets.service.ts`: Implements business orchestration, pagination calculation, existence verification, and relationship safety checks.
+  - `src/controllers/tickets.controller.ts`: Handles HTTP request/response mapping and invokes service methods.
+  - `src/routes/tickets.routes.ts`: Pure route declarations attaching validation middleware to controller actions.
+  - `src/routes/index.ts`: Central v1 API router mounting `/tickets`.
+  - `src/app.ts`: Express application setup with CORS, JSON parsing, logging, and error pipelines.
+  - `src/server.ts`: Starts HTTP listener on configured port with signal traps for graceful shutdown (`SIGINT`, `SIGTERM`).
+  - `src/index.ts`: Re-exports application and server.
+
+## 3. Files Created and Modified
+### Created:
+- `apps/api/src/config/env.ts`
+- `apps/api/src/config/database.ts`
+- `apps/api/src/utils/response.ts`
+- `apps/api/src/errors/appError.ts`
+- `apps/api/src/middleware/requestLogger.ts`
+- `apps/api/src/middleware/validateRequest.ts`
+- `apps/api/src/middleware/errorHandler.ts`
+- `apps/api/src/middleware/notFound.ts`
+- `apps/api/src/schemas/ticket.schema.ts`
+- `apps/api/src/repositories/tickets.repository.ts`
+- `apps/api/src/services/tickets.service.ts`
+- `apps/api/src/controllers/tickets.controller.ts`
+- `apps/api/src/routes/health.routes.ts`
+- `apps/api/src/routes/tickets.routes.ts`
+- `apps/api/src/routes/index.ts`
+- `apps/api/src/app.ts`
+- `apps/api/src/server.ts`
+- `apps/api/tests/api.test.ts`
+
+### Modified:
+- `apps/api/package.json` (added dependencies and `"test"` script)
+- `apps/api/package-lock.json`
+- `apps/api/src/index.ts` (re-exports `app` and `server`)
+- `docs/prompt-journal.md` (appended Day 9 entry)
+
+## 4. Problems Encountered and Solutions
+- **Express 5 Read-Only `req.query` and `req.params`:** In Express 5, `req.query` is a getter on `IncomingMessage` and direct assignment (`req.query = parsed`) throws a TypeError. Solved by using `Object.defineProperty(req, "query", { value: parsedQuery, writable: true, configurable: true })` in the validation middleware.
+- **Strict RFC 4122 UUID Validation vs. Seed UUIDs:** Zod's default `.uuid()` validator strictly enforces RFC 4122 version and variant bits. Day 8's deterministic database seeds (e.g. `00000002-0000-0000-0000-000000000002`) failed this check despite being valid PostgreSQL UUIDs. Solved by defining a canonical 32-hex UUID regex (`/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/`), ensuring compatibility with both standard UUIDv4 and deterministic seed records.
+- **Test Isolation and Seed Preservation:** Tests were designed to find existing tickets for read tests and isolate create/update tests with dedicated cleanup in an `after` hook. Verified that the database record count remained exactly 50 tickets after all test runs.
+- **Database Teardown Encapsulation:** Decoupled `server.ts` from direct Prisma and pg dependencies by introducing `disconnectDatabase(): Promise<void>` in `src/config/database.ts` with error traps.
+
+## 5. Tests Executed & Actual Output
+Test runner: Node.js native test runner (`tsx --test tests/**/*.test.ts`) using `node:test`, `node:assert/strict`, and `supertest`.
+
+```
+▶ SupportDesk Day 9 — API Skeleton & MVC Architecture Tests
+  ▶ 1. GET /health
+    ✔ returns 200 with status ok and standard response envelope
+  ▶ 2. GET /api/v1/tickets (List & Filtering)
+    ✔ returns 200 with paginated ticket list and meta
+    ✔ filters tickets by status
+    ✔ filters tickets by priority
+  ▶ 3. Pagination Parameter Validation
+    ✔ rejects negative page parameter with 400 VALIDATION_ERROR
+    ✔ rejects non-numeric page parameter with 400 VALIDATION_ERROR
+    ✔ rejects limit exceeding maximum 100 with 400 VALIDATION_ERROR
+  ▶ 4. Query Enum Filter Validation
+    ✔ rejects invalid status filter with 400 VALIDATION_ERROR
+    ✔ rejects invalid priority filter with 400 VALIDATION_ERROR
+  ▶ 5. GET /api/v1/tickets/:id (Fetch existing ticket)
+    ✔ returns 200 with ticket detail and relations
+  ▶ 6. GET /api/v1/tickets/:id (Fetch nonexistent ticket)
+    ✔ returns 404 with NOT_FOUND error code
+  ▶ 7. GET /api/v1/tickets/:id (Invalid UUID format)
+    ✔ returns 400 with VALIDATION_ERROR
+  ▶ 8. POST /api/v1/tickets (Create valid ticket)
+    ✔ returns 201 with newly created ticket
+  ▶ 9. POST /api/v1/tickets (Create invalid ticket)
+    ✔ returns 400 when fields fail validation constraints
+  ▶ 10. PATCH /api/v1/tickets/:id (Update existing ticket)
+    ✔ returns 200 with updated fields
+  ▶ 11. PATCH /api/v1/tickets/:id (Update nonexistent ticket)
+    ✔ returns 404 when updating non-existent UUID
+  ▶ 12. Standard Response Envelope Contract
+    ✔ enforces { data, error, meta } on success
+    ✔ enforces { data: null, error: { code, message }, meta } on 404 error
+  ▶ 13. Safe Error Handling
+    ✔ returns 400 for malformed JSON request body
+    ✔ returns 404 with standard envelope for unmapped endpoint
+    ✔ safely handles unexpected 500 error without exposing stack or raw details
+  ▶ 14. Environment Configuration Validation (Unit)
+    ✔ rejects configuration when DATABASE_URL is missing
+    ✔ rejects configuration when PORT is negative
+    ✔ rejects configuration when PORT is non-numeric
+    ✔ successfully parses valid configuration and coerces string port to number
+✔ SupportDesk Day 9 — API Skeleton & MVC Architecture Tests (201ms)
+ℹ tests 25
+ℹ suites 15
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
