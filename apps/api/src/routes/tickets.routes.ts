@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { ticketsController } from "../controllers/tickets.controller.js";
+import { commentsRouter } from "./comments.routes.js";
 import { validateRequest } from "../middleware/validateRequest.js";
+import { authenticate, authorize, UserRole } from "../middleware/auth.middleware.js";
 import {
   ticketIdParamSchema,
   listTicketsQuerySchema,
@@ -9,6 +11,12 @@ import {
 } from "../schemas/ticket.schema.js";
 
 export const ticketsRouter = Router();
+
+// Apply authenticate to all ticket endpoints
+ticketsRouter.use(authenticate);
+
+// Mount comments nested router
+ticketsRouter.use("/:ticketId/comments", commentsRouter);
 
 ticketsRouter.get(
   "/",
@@ -39,6 +47,7 @@ ticketsRouter.patch(
 
 ticketsRouter.delete(
   "/:id",
+  authorize(UserRole.ADMIN),
   validateRequest({ params: ticketIdParamSchema }),
   ticketsController.deleteTicket
 );
