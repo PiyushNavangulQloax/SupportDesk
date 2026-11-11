@@ -32,7 +32,7 @@ Key achievements include:
 ## 3. Pull Request & Git Status
 
 - **Primary Feature Branch:** `feat/day-11-tickets-comments-openapi`
-- **Head Commit:** `e803e71` (`feat(api): implement ticket querying, comments API, OpenAPI docs, and integration test suite`)
+- **Head Commits:** `e803e71` (API Implementation) + `91182ea` (Documentation Deliverables)
 - **Remote Tracking:** Pushed to `origin/feat/day-11-tickets-comments-openapi`
 - **Base Branch (Stacked):** `feat/day-9-api-skeleton` (stacked on PR #17, which targets `feat/day-8-prisma-database` in PR #16)
 - **Live Pull Request:** [PR #20](https://github.com/PiyushNavangulQloax/SupportDesk/pull/20) (`state: OPEN`, `mergeable: MERGEABLE`)

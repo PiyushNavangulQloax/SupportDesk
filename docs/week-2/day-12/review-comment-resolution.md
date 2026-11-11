@@ -14,7 +14,7 @@
 | **Repository** | `PiyushNavangulQloax/SupportDesk` | Verified via GitHub CLI (`gh pr view 20`) |
 | **Pull Request Number** | **#20** | Live on GitHub |
 | **Pull Request URL** | [PR #20](https://github.com/PiyushNavangulQloax/SupportDesk/pull/20) | Verified URL |
-| **Feature (Head) Branch**| `feat/day-11-tickets-comments-openapi` | Commit `e803e71` (`origin/feat/day-11-tickets-comments-openapi`) |
+| **Feature (Head) Branch**| `feat/day-11-tickets-comments-openapi` | Commits: `e803e71` (API) + `91182ea` (Docs) |
 | **Base Branch (Stacked)**| `feat/day-9-api-skeleton` | Stacked on PR #17 (which targets `feat/day-8-prisma-database` in PR #16) |
 | **PR State** | **OPEN** | `mergeable: MERGEABLE` (0 merge conflicts) |
 | **Review Decision** | `Pending Review` | Awaiting reviewer assignment |

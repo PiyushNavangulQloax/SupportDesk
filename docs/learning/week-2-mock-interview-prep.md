@@ -487,27 +487,28 @@ Below is the definitive walkthrough of every Week 2 curriculum concept, demonstr
 
 ---
 
-## 5. 20-Concept Mastery Assessment Matrix
+## 5. 20-Concept Mastery & Code Verification Matrix
+*(Self-Study & AI-Guided Implementation Verification Matrix — Official Lead Assessment Pending)*
 
 | # | Curriculum Concept | SupportDesk Code Anchor | Verification Status |
 |:---:|:---|:---|:---:|
-| 1 | Authentication vs. Authorization | `auth.middleware.ts` & `tickets.service.ts` | **Mastered** |
-| 2 | JWT Stateless Architecture | `src/utils/jwt.ts` | **Mastered** |
-| 3 | JWT Structure (Header, Payload, Signature) | `src/utils/jwt.ts` (`HS256`) | **Mastered** |
-| 4 | Token Expiration (`exp`) Handling | `src/config/env.ts` (`JWT_EXPIRES_IN="1d"`) | **Mastered** |
-| 5 | Password Hashing vs Encryption | `src/utils/password.ts` | **Mastered** |
-| 6 | bcrypt Algorithm & Work Factor 12 | `src/utils/password.ts` (`BCRYPT_ROUNDS = 12`) | **Mastered** |
-| 7 | Express Auth Middleware & Context Binding | `src/middleware/auth.middleware.ts` | **Mastered** |
-| 8 | Role-Based Access Control (RBAC) | `prisma/schema.prisma` (`UserRole`) | **Mastered** |
-| 9 | CUSTOMER vs AGENT vs ADMIN Matrix | `tickets.service.ts` & `comments.service.ts` | **Mastered** |
-| 10 | HTTP 401 vs. 403 Status Semantics | `src/errors/appError.ts` | **Mastered** |
-| 11 | REST API Design Conventions | Plural nouns, JSend envelope | **Mastered** |
-| 12 | HTTP Method & Status Code Semantics | GET (200), POST (201), PATCH (200), 400, 404 | **Mastered** |
-| 13 | Layered MVC Architecture | Routes $\rightarrow$ Controllers $\rightarrow$ Services $\rightarrow$ Repos | **Mastered** |
-| 14 | Separation of Concerns (Services vs. Repos) | Isolated business logic & Prisma access | **Mastered** |
-| 15 | Runtime Zod Schema Validation | `src/schemas/` & `validate.ts` | **Mastered** |
-| 16 | Prisma ORM & Database Migrations | `prisma/schema.prisma` | **Mastered** |
-| 17 | Relational Integrity & Foreign Keys | `onDelete: Restrict` & `onDelete: SetNull` | **Mastered** |
-| 18 | IDOR Mitigation & Anti-Enumeration (404) | `TicketsService.getTicketById` | **Mastered** |
-| 19 | Comments API & Internal Note Scoping | `CommentsService.listComments` (`isInternal`) | **Mastered** |
-| 20 | Unit vs Integration Tests & OpenAPI | Jest mocks, Supertest (`supportdesk_test`), Swagger | **Mastered** |
+| 1 | Authentication vs. Authorization | `auth.middleware.ts` & `tickets.service.ts` | **Verified in Code** |
+| 2 | JWT Stateless Architecture | `src/utils/jwt.ts` | **Verified in Code** |
+| 3 | JWT Structure (Header, Payload, Signature) | `src/utils/jwt.ts` (`HS256`) | **Verified in Code** |
+| 4 | Token Expiration (`exp`) Handling | `src/config/env.ts` (`JWT_EXPIRES_IN="1d"`) | **Verified in Code** |
+| 5 | Password Hashing vs Encryption | `src/utils/password.ts` | **Verified in Code** |
+| 6 | bcrypt Algorithm & Work Factor 12 | `src/utils/password.ts` (`BCRYPT_ROUNDS = 12`) | **Verified in Code** |
+| 7 | Express Auth Middleware & Context Binding | `src/middleware/auth.middleware.ts` | **Verified in Code** |
+| 8 | Role-Based Access Control (RBAC) | `prisma/schema.prisma` (`UserRole`) | **Verified in Code** |
+| 9 | CUSTOMER vs AGENT vs ADMIN Matrix | `tickets.service.ts` & `comments.service.ts` | **Verified in Code** |
+| 10 | HTTP 401 vs. 403 Status Semantics | `src/errors/appError.ts` | **Verified in Code** |
+| 11 | REST API Design Conventions | Plural nouns, JSend envelope | **Verified in Code** |
+| 12 | HTTP Method & Status Code Semantics | GET (200), POST (201), PATCH (200), 400, 404 | **Verified in Code** |
+| 13 | Layered MVC Architecture | Routes $\rightarrow$ Controllers $\rightarrow$ Services $\rightarrow$ Repos | **Verified in Code** |
+| 14 | Separation of Concerns (Services vs. Repos) | Isolated business logic & Prisma access | **Verified in Code** |
+| 15 | Runtime Zod Schema Validation | `src/schemas/` & `validate.ts` | **Verified in Code** |
+| 16 | Prisma ORM & Database Migrations | `prisma/schema.prisma` | **Verified in Code** |
+| 17 | Relational Integrity & Foreign Keys | `onDelete: Restrict` & `onDelete: SetNull` | **Verified in Code** |
+| 18 | IDOR Mitigation & Anti-Enumeration (404) | `TicketsService.getTicketById` | **Verified in Code** |
+| 19 | Comments API & Internal Note Scoping | `CommentsService.listComments` (`isInternal`) | **Verified in Code** |
+| 20 | Unit vs Integration Tests & OpenAPI | Jest mocks, Supertest (`supportdesk_test`), Swagger | **Verified in Code** |
