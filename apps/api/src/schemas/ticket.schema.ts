@@ -14,6 +14,12 @@ export const listTicketsQuerySchema = z.object({
     .optional(),
   priority: z.enum(["P1", "P2", "P3", "P4"]).optional(),
   category: z.string().trim().optional(),
+  assigneeId: uuidSchema.optional(),
+  search: z.string().trim().optional(),
+  sortBy: z
+    .enum(["createdAt", "updatedAt", "priority", "status", "title"])
+    .default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -30,7 +36,6 @@ export const createTicketBodySchema = z.object({
     .min(5, "Description must be at least 5 characters"),
   priority: z.enum(["P1", "P2", "P3", "P4"]).default("P3"),
   category: z.string().trim().max(100).optional(),
-  createdById: uuidSchema,
   assigneeId: uuidSchema.optional(),
   slaDueAt: z.string().datetime().optional(),
 });

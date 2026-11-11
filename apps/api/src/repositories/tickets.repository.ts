@@ -26,6 +26,11 @@ export interface ListTicketsFilters {
   status?: TicketStatus;
   priority?: TicketPriority;
   category?: string;
+  createdById?: string;
+  assigneeId?: string;
+  search?: string;
+  sortBy?: "createdAt" | "updatedAt" | "priority" | "status" | "title" | string;
+  sortOrder?: "asc" | "desc";
   skip?: number;
   take?: number;
 }
@@ -66,13 +71,43 @@ export class TicketsRepository {
         mode: "insensitive",
       };
     }
+    if (filters.createdById) {
+      where.createdById = filters.createdById;
+    }
+    if (filters.assigneeId) {
+      where.assigneeId = filters.assigneeId;
+    }
+    if (filters.search) {
+      where.OR = [
+        {
+          title: {
+            contains: filters.search,
+            mode: "insensitive",
+          },
+        },
+        {
+          description: {
+            contains: filters.search,
+            mode: "insensitive",
+          },
+        },
+      ];
+    }
+
+    const allowedSortFields = ["createdAt", "updatedAt", "priority", "status", "title"];
+    const sortBy =
+      filters.sortBy && allowedSortFields.includes(filters.sortBy)
+        ? filters.sortBy
+        : "createdAt";
+    const sortOrder = filters.sortOrder === "asc" ? "asc" : "desc";
+    const orderBy = { [sortBy]: sortOrder };
 
     const [tickets, total] = await Promise.all([
       prisma.ticket.findMany({
         where,
         skip: filters.skip,
         take: filters.take,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         include: {
           createdBy: {
             select: { id: true, name: true, email: true },

@@ -41,3 +41,15 @@ export class ConflictError extends AppError {
     super(message, 409, "CONFLICT", details);
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message = "Authentication required", details?: unknown) {
+    super(message, 401, "UNAUTHORIZED", details);
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = "Access forbidden", details?: unknown) {
+    super(message, 403, "FORBIDDEN", details);
+  }
+}
