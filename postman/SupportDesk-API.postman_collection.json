@@ -1,0 +1,1142 @@
+{
+  "info": {
+    "_postman_id": "9b1778c1-158a-4467-96a9-83bc123019a5",
+    "name": "SupportDesk REST API",
+    "description": "Comprehensive Postman collection for SupportDesk REST API demonstrating Authentication, RBAC, Ticket Querying, Comments, and OpenAPI Documentation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Health & Documentation",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Health status is ok\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql(\"ok\");",
+                  "    pm.expect(json.timestamp).to.be.a(\"string\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "OpenAPI Documentation (Swagger UI)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/docs",
+              "host": ["{{baseUrl}}"],
+              "path": ["docs"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Swagger UI HTML rendered\", function () {",
+                  "    pm.expect(pm.response.text()).to.include(\"swagger-ui\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Raw OpenAPI 3.0.3 Specification JSON",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/docs/openapi.json",
+              "host": ["{{baseUrl}}"],
+              "path": ["docs", "openapi.json"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Valid OpenAPI 3.0.3 schema\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.openapi).to.eql(\"3.0.3\");",
+                  "    pm.expect(json.info.title).to.include(\"SupportDesk\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Authentication & Perimeter Security",
+      "item": [
+        {
+          "name": "Register Customer (Jane)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Customer\",\n  \"email\": \"jane.customer@example.com\",\n  \"password\": \"SecurePassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 or 409 (if exists)\", function () {",
+                  "    pm.expect([201, 409]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    pm.test(\"Password hash strictly omitted\", function () {",
+                  "        pm.expect(json.data.user.passwordHash).to.be.undefined;",
+                  "    });",
+                  "    pm.environment.set(\"customerToken\", json.data.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Customer (Jane)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jane.customer@example.com\",\n  \"password\": \"SecurePassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Returns valid token and safe user\", function () {",
+                  "    pm.expect(json.data.accessToken).to.be.a(\"string\");",
+                  "    pm.expect(json.data.user.role).to.eql(\"CUSTOMER\");",
+                  "    pm.expect(json.data.user.passwordHash).to.be.undefined;",
+                  "});",
+                  "pm.environment.set(\"customerToken\", json.data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Customer B (Bob - for IDOR Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bob Customer\",\n  \"email\": \"bob.customer@example.com\",\n  \"password\": \"SecurePassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 or 409 (if exists)\", function () {",
+                  "    pm.expect([201, 409]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    pm.environment.set(\"customerBToken\", json.data.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Customer B (Bob)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob.customer@example.com\",\n  \"password\": \"SecurePassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.environment.set(\"customerBToken\", json.data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Agent (Priya)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"priya.kapoor@supportdesk.internal\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Role is AGENT\", function () {",
+                  "    pm.expect(json.data.user.role).to.eql(\"AGENT\");",
+                  "});",
+                  "pm.environment.set(\"agentToken\", json.data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Admin (Sofia)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sofia.admin@supportdesk.internal\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Role is ADMIN\", function () {",
+                  "    pm.expect(json.data.user.role).to.eql(\"ADMIN\");",
+                  "});",
+                  "pm.environment.set(\"adminToken\", json.data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 Unauthorized (No Token)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Standard error envelope returned\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.error.code).to.eql(\"UNAUTHORIZED\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Ticket Operations & Ownership Isolation",
+      "item": [
+        {
+          "name": "Customer Jane Creates Ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"VPN Disconnecting on Wi-Fi\",\n  \"description\": \"Intermittent packet drops when connected to corporate Wi-Fi network.\",\n  \"priority\": \"P2\",\n  \"category\": \"Network\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Ticket created successfully\", function () {",
+                  "    pm.expect(json.data.id).to.be.a(\"string\");",
+                  "    pm.expect(json.data.status).to.eql(\"OPEN\");",
+                  "    pm.expect(json.data.priority).to.eql(\"P2\");",
+                  "});",
+                  "pm.environment.set(\"ticketId\", json.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer Bob Creates Ticket (Customer B Ticket)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerBToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Bob Confidential Payroll Ticket\",\n  \"description\": \"Financial payroll software sync failure. Confidential compensation data.\",\n  \"priority\": \"P1\",\n  \"category\": \"Finance\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.environment.set(\"customerBTicketId\", json.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer Jane Lists Tickets (Ownership Scoped)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "var bobTicketId = pm.environment.get(\"customerBTicketId\");",
+                  "pm.test(\"Customer Jane NEVER sees Customer Bob ticket\", function () {",
+                  "    var ticketIds = json.data.map(function(t) { return t.id; });",
+                  "    pm.expect(ticketIds).to.not.include(bobTicketId);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer Jane Gets Own Ticket by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Returns correct ticket\", function () {",
+                  "    pm.expect(json.data.id).to.eql(pm.environment.get(\"ticketId\"));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer Jane Updates Own Ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"VPN Disconnecting on Wi-Fi (Updated Details)\",\n  \"description\": \"Drops primarily on 5GHz band; 2.4GHz is stable.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Ticket updated\", function () {",
+                  "    pm.expect(json.data.title).to.include(\"Updated Details\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 Forbidden (Customer Assigning Ticket)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Unauthorized Assignment Attempt\",\n  \"description\": \"Customer trying to set an assigneeId directly.\",\n  \"assigneeId\": \"00000001-0000-0000-0000-000000000005\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 403 Forbidden\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Error code is FORBIDDEN\", function () {",
+                  "    pm.expect(json.error.code).to.eql(\"FORBIDDEN\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 Anti-Enumeration (Jane Accessing Bob's Ticket)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{customerBTicketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{customerBTicketId}}"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 404 NOT_FOUND (Anti-Enumeration)\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Error code is NOT_FOUND\", function () {",
+                  "    pm.expect(json.error.code).to.eql(\"NOT_FOUND\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Advanced Querying (Agent / Admin)",
+      "item": [
+        {
+          "name": "Agent Pagination (page=1, limit=5)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets?page=1&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Pagination metadata correct\", function () {",
+                  "    pm.expect(json.meta.pagination.page).to.eql(1);",
+                  "    pm.expect(json.meta.pagination.limit).to.eql(5);",
+                  "    pm.expect(json.meta.pagination.total).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Agent Filter by Status & Priority (status=OPEN, priority=P2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets?status=OPEN&priority=P2",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "OPEN"
+                },
+                {
+                  "key": "priority",
+                  "value": "P2"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "json.data.forEach(function(t) {",
+                  "    pm.expect(t.status).to.eql(\"OPEN\");",
+                  "    pm.expect(t.priority).to.eql(\"P2\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Agent Substring Search (search=Disconnecting)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets?search=Disconnecting",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "Disconnecting"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Search results contain keyword\", function () {",
+                  "    pm.expect(json.data.length).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Agent Allowlisted Dynamic Sorting (sortBy=createdAt, sortOrder=desc)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets?sortBy=createdAt&sortOrder=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "createdAt"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 Bad Request (Invalid Sort Field)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets?sortBy=passwordHash",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "passwordHash"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Error code is VALIDATION_ERROR\", function () {",
+                  "    pm.expect(json.error.code).to.eql(\"VALIDATION_ERROR\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Comments API & Visibility Boundaries",
+      "item": [
+        {
+          "name": "Customer Jane Creates Public Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Ran network diagnostic: Wi-Fi beacon frames drop every 15 minutes.\",\n  \"isInternal\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}", "comments"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Comment is public\", function () {",
+                  "    pm.expect(json.data.isInternal).to.be.false;",
+                  "    pm.expect(json.data.authorId).to.be.a(\"string\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 Forbidden (Customer Posting Internal Note)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Customer attempting to create an internal note\",\n  \"isInternal\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}", "comments"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 403 Forbidden\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Error code is FORBIDDEN\", function () {",
+                  "    pm.expect(json.error.code).to.eql(\"FORBIDDEN\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Agent Creates Internal Note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Internal Note: Access point 3B on floor 4 running buggy firmware 9.8. Scheduled reboot tonight at 23:00.\",\n  \"isInternal\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}", "comments"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Comment is marked internal\", function () {",
+                  "    pm.expect(json.data.isInternal).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer Lists Comments (NEVER Sees Internal Comments)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}", "comments"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Customer receives ONLY public comments\", function () {",
+                  "    pm.expect(json.data.length).to.be.at.least(1);",
+                  "    json.data.forEach(function(c) {",
+                  "        pm.expect(c.isInternal).to.be.false;",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Agent Lists Comments (Sees BOTH Public & Internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}", "comments"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Agent sees both public and internal comments\", function () {",
+                  "    var internalFlags = json.data.map(function(c) { return c.isInternal; });",
+                  "    pm.expect(internalFlags).to.include(true);",
+                  "    pm.expect(internalFlags).to.include(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 Anti-Enumeration (Jane Commenting on Bob's Ticket)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Malicious comment on Bob's ticket\",\n  \"isInternal\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{customerBTicketId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{customerBTicketId}}", "comments"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 404 NOT_FOUND\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Error code is NOT_FOUND\", function () {",
+                  "    pm.expect(json.error.code).to.eql(\"NOT_FOUND\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
