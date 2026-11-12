@@ -537,7 +537,7 @@ Implement the frontend foundations for SupportDesk in `apps/web` using React 18,
    - Typed helper functions (`request`, `loginUser`).
 3. **Authentication Context & State (`src/lib/auth.tsx`):**
    - React Context provider (`AuthProvider`) and consumer hook (`useAuth`).
-   - Secure token and user storage in `sessionStorage`.
+   - Token and user session persistence using `sessionStorage`.
    - In-memory reactive state synchronized with storage and session restoration on initial mount.
    - Full client-side logout: clears `sessionStorage`, resets auth state, and wipes TanStack Query cache.
    - Custom event listener for API client 401 interceptor triggering automatic logout.
@@ -560,8 +560,12 @@ Implement the frontend foundations for SupportDesk in `apps/web` using React 18,
 
 ### 4. Key Architectural & Security Decisions
 - **Token Storage Decision (`sessionStorage` vs `localStorage` vs HttpOnly Cookies):**
-  - Evaluated: `localStorage` persists across browser sessions and tabs, making it vulnerable to persistent XSS harvesting. HttpOnly cookies prevent JavaScript access entirely but require backend cookie/CORS configuration not present in the current stateless JWT API.
-  - Selected: `sessionStorage`. Limits token exposure strictly to the active browser tab, automatically self-destructs when the tab is closed, prevents cross-tab session leakage, and requires zero changes to the stateless backend architecture.
+  - Evaluated: `localStorage` persists across browser sessions and tabs, increasing exposure to long-term XSS harvesting. `HttpOnly` SameSite cookies prevent client-side JavaScript access entirely, but require backend cookie handling and CORS credentials not currently implemented in the stateless Bearer token API.
+  - Selected: `sessionStorage`. Chosen as a pragmatic initial storage choice that requires no backend alterations, with the following documented security characteristics:
+    - `sessionStorage` is strictly scoped to a browser tab's specific page session and prevents token leakage across disparate tabs.
+    - It remains accessible to any JavaScript executing in the same origin and is **vulnerable to XSS**.
+    - Browser session restoration mechanisms (such as "Reopen Closed Tab" or crash recovery) may preserve `sessionStorage` state across tab restarts; tokens are not immediately or universally destroyed.
+    - It is a pragmatic initial storage choice, not an XSS-proof security solution.
 - **Client-Side Logout Boundary:**
   - Because the existing backend is a stateless JWT architecture with no token denylist or revocation endpoint (`/api/v1/auth/logout`), logout is enforced strictly on the client.
   - Logout clears `sessionStorage`, resets in-memory React state, and cancels/clears all cached queries in TanStack Query (`queryClient.clear()`).
