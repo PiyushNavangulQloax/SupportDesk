@@ -1010,3 +1010,124 @@ $ npm test -- --run
       Tests  74 passed (74)
    Duration  1.66s
 ```
+
+
+---
+
+## Entry 18 — Day 14 Stage 4A: Ticket List Screen
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 4A)  
+
+### 1. Task / Context
+Implement the production-grade Ticket List Screen using the existing SupportDesk frontend architecture, TanStack Query hooks, and reusable UI components. Deliver a responsive table and card view, server-side pagination with backend metadata, live search, status and priority filtering, filter clearing, empty/no-results/error/loading states, and detail route navigation without inventing unsupported backend endpoints or doing insecure client-side filtering.
+
+### 2. Exact Prompts Used
+
+**Stage 4A Prompt:**
+> "Implement the Ticket List Screen using the existing frontend architecture.
+> Requirements:
+> 1. Fetch tickets through the existing useTickets hook.
+> 2. Render a responsive ticket list/table.
+> 3. Display: Ticket title, Ticket status, Priority, Category (when available), Creation date, Assignee (only when supported by actual API response).
+> 4. Use existing StatusBadge and PriorityBadge components.
+> 5. Add server-side pagination using the backend pagination metadata.
+> 6. Add search using the existing supported search filter.
+> 7. Add status and priority filters using only supported backend values.
+> 8. Ensure changing filters resets pagination to page 1.
+> 9. Ensure pagination changes fetch the correct server page.
+> 10. Add a clear-filters action.
+> 11. Clicking a ticket should navigate to its detail route, using existing routing conventions.
+> Step 3: Handle UI states (initial loading, background refetch, empty state, no-results state, error state with retry, pagination disabled states).
+> Step 4: Role and security considerations (CUSTOMER sees only their tickets via backend scoping; AGENT/ADMIN see workspace tickets; no client-side security filtering; no invented agent assignment dropdown).
+> Step 5: Tests (rendering, loading, empty, error, badges, search, filters, pagination, page resets, navigation, query hook usage)."
+
+### 3. Summary of Implementation & Features
+
+1. **Core Ticket List Screen (`apps/web/src/features/tickets/components/TicketList.tsx`):**
+   - Utilizes `useTickets({ page, limit: pageSize, status, priority, search })` with deep query key reactivity.
+   - Dual responsive layout:
+     - **Desktop Table View (`hidden md:block`):** Full tabular display featuring ticket details (title and description preview), status badge, priority badge, category badge, assignee indicator with avatar initial, formatted creation date, and interactive action link.
+     - **Mobile Card View (`divide-y md:hidden`):** Touch-friendly card listing retaining full information density and tap targets.
+   - Safe data rendering:
+     - Category displays as a subtle neutral badge when populated or em-dash (`—`) when null.
+     - Assignee displays the assigned agent's name (`ticket.assignee.name || ticket.assignee.email`) or an italicized "Unassigned" indicator when null. No fake assignment dropdowns invented.
+     - Creation date formatted cleanly with standard US English formatting (`Nov 12, 2026`).
+
+2. **Search, Filtering, and Resetting:**
+   - Search bar with clear button (`X`), submit trigger, and Enter key support.
+   - Status dropdown with backend enum values (`OPEN`, `IN_PROGRESS`, `WAITING_ON_CUSTOMER`, `RESOLVED`, `CLOSED`).
+   - Priority dropdown with backend enum values (`P1`, `P2`, `P3`, `P4`).
+   - Any change to search, status, or priority automatically resets pagination to page 1.
+   - Dedicated "Clear filters" action button visible whenever any filter is active, immediately resetting state and fetching default page 1 results.
+
+3. **Server-Side Pagination:**
+   - Powered by backend pagination metadata (`total`, `totalPages`, `page`, `limit`).
+   - Displays exact range (`Showing X to Y of Z tickets`) and page indicator (`Page X of Y`).
+   - "Previous" disabled on page 1 or during fetching.
+   - "Next" disabled on final page or during fetching.
+   - Navigating pages triggers server-side queries for the targeted page.
+
+4. **Robust UI States:**
+   - **Loading State:** Centered card with animated spinner and `role="status"` live region.
+   - **Background Refetch Indicator:** Subtle animated "Refreshing..." chip in the toolbar when background queries re-validate without flickering the table.
+   - **Empty State:** Distinct card view when zero tickets exist for the user/system.
+   - **No Results State:** Filter-specific empty view with an integrated "Clear all filters" CTA.
+   - **Error State:** Accessible error `Alert` showing the server error message with an interactive "Try again" retry button.
+
+5. **Routing Integration:**
+   - Created `apps/web/src/pages/TicketsPage.tsx` and updated `apps/web/src/App.tsx` routing `/tickets` directly to `TicketsPage`.
+   - Cleaned up obsolete `TicketsPlaceholderPage.tsx` from Day 13.
+   - Ticket titles, cards, and row action links navigate to `/tickets/${ticket.id}`.
+
+### 4. Files Created, Modified, and Deleted
+#### Created:
+- `apps/web/src/features/tickets/components/TicketList.tsx`
+- `apps/web/src/features/tickets/components/index.ts`
+- `apps/web/src/pages/TicketsPage.tsx`
+- `apps/web/tests/TicketList.test.tsx`
+
+#### Modified:
+- `apps/web/src/App.tsx` (switched `/tickets` route to `TicketsPage`)
+- `apps/web/src/components/layout/Sidebar.tsx` (typed navigation items)
+- `docs/prompt-journal.md` (appended Day 14 Stage 4A entry)
+
+#### Deleted:
+- `apps/web/src/pages/TicketsPlaceholderPage.tsx` (superseded by `TicketsPage`)
+
+### 5. Automated Tests Added & Verification Results
+Added `apps/web/tests/TicketList.test.tsx` containing 11 tests:
+1. `renders accessible loading indicator while fetching tickets`
+2. `renders tickets with title, status, priority, category, assignee, and dates`
+3. `renders empty state when no tickets are present and no filters active`
+4. `renders no-results state with clear-filters action when active filters return empty`
+5. `renders error state when API fails and allows retrying`
+6. `applies search query and resets pagination to page 1`
+7. `applies status and priority dropdown filters`
+8. `handles pagination navigation and disables boundary buttons`
+9. `resets page to 1 when status filter changes from page 2`
+10. `resets all active filters and restores page 1 when clear-filters is clicked`
+11. `navigates to /tickets/:id when clicking on ticket title or row`
+
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm test -- --run
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/components.ui.test.tsx (24 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/TicketList.test.tsx (11 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  8 passed (8)
+      Tests  85 passed (85)
+   Duration  1.77s
+
+$ npm run build
+tsc -b && vite build -> 1661 modules transformed, dist/ generated in 1.09s
+```

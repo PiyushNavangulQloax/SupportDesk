@@ -9,7 +9,12 @@ export interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
-  const navItems = [
+  const navItems: {
+    label: string;
+    to: string;
+    icon: React.ReactNode;
+    badge?: string;
+  }[] = [
     {
       label: "Dashboard",
       to: "/",
@@ -19,7 +24,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
       label: "Tickets",
       to: "/tickets",
       icon: <Ticket className="w-4 h-4" />,
-      badge: "Foundation",
     },
   ];
 

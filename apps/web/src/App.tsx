@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
-import { TicketsPlaceholderPage } from "./pages/TicketsPlaceholderPage";
+import { TicketsPage } from "./pages/TicketsPage";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
 
@@ -46,7 +46,7 @@ export const App: React.FC = () => {
       {/* Protected Routes (wrapped with AppLayout) */}
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/tickets" element={<TicketsPlaceholderPage />} />
+        <Route path="/tickets" element={<TicketsPage />} />
       </Route>
 
       {/* Catch-all fallback */}
