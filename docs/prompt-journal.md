@@ -1131,3 +1131,109 @@ $ npm test -- --run
 $ npm run build
 tsc -b && vite build -> 1661 modules transformed, dist/ generated in 1.09s
 ```
+
+
+---
+
+## Entry 19 — Day 14 Stage 4B: Ticket Detail Screen & Conversation Thread
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 4B)  
+
+### 1. Task / Context
+Implement the production-grade Ticket Detail Screen under `apps/web/` on the dedicated feature branch `feat/web-ticket-detail-screen`. Incorporate full ticket metadata presentation (title, description, status, priority, category, requester, assignee, timestamps, SLA), conversation history (comments thread with customer vs. staff role badges and internal note indicators), and interactive comment submission with validation, loading states, and automatic TanStack Query cache invalidation.
+
+### 2. Exact Prompts Used
+
+**Stage 4B Prompt:**
+> "Create a complete ticket detail experience.
+> A. Ticket Detail Page: Navigate from ticket list to /tickets/:ticketId. Display: Ticket ID, Ticket title, Full description, Status, Priority, Category (if available), Customer information (according to RBAC), Assigned agent (if available), Created date, Last updated date.
+> B. Ticket Information Layout: Responsive layout (Main content area: title, description, metadata, comments history, add comment section; Sidebar: status, priority, assigned agent, customer details, timestamps).
+> C. Comments and Conversation History: Integrate comments API and TanStack Query hooks. Display content, author, role, timestamp, chronological history. Distinguish customer and agent comments. Handle empty, loading, and error states.
+> D. Add Comment Functionality: Textarea, submit button, empty validation, prevent duplicate submissions, loading state, display API errors, clear on success, invalidate cache.
+> E. Navigation: Back to tickets, invalid ticket ID handling, 404 not-found state, error state with retry.
+> Testing & Verification: Comprehensive Vitest tests for all states, typecheck, build.
+> Branch: feat/web-ticket-detail-screen. Do not create a commit unless explicitly authorized."
+
+### 3. Summary of Implementation & Features
+
+1. **Ticket Detail Component (`apps/web/src/features/tickets/components/TicketDetail.tsx`):**
+   - Resolves ticket ID from URL route parameters (`/tickets/:ticketId`).
+   - Fetches single ticket via `useTicket(ticketId)`.
+   - Fetches conversation thread via `useComments(ticketId)`.
+   - Implements comment mutation via `useCreateComment(ticketId)`.
+   - **Responsive 2-Column Layout (`grid-cols-1 lg:grid-cols-3`):**
+     - **Main Content (2 cols):** Back link navigation, full ticket header, rich description card, conversation history section, and add response form.
+     - **Sidebar Overview (1 col):** Status badge, Priority badge, Category badge, Customer / Requester card (name, email, avatar), Assigned Agent card (name, email, avatar), and formatted timestamps (Created, Updated, SLA Due).
+
+2. **Conversation History & Comments Thread:**
+   - Chronological message list with author avatar, author name, and colored role badges:
+     - `AGENT` (blue pill badge)
+     - `ADMIN` (purple pill badge)
+     - `CUSTOMER` (emerald pill badge)
+   - Staff Internal Notes: Displays an amber `Internal Note` pill badge with a lock icon and subtle amber container styling (`bg-amber-50/70 border-amber-200`).
+   - Strict RBAC: Backend automatically excludes internal notes for customers; frontend respects this guarantee.
+   - Empty state: Clean dashed card encouraging users to start the conversation.
+   - Loading & Error states: Accessible spinner and error alert with retry button.
+
+3. **Add Comment Form & Mutations:**
+   - Accessible `Textarea` with character counter (`maxLength={5000}`) and dynamic validation.
+   - Prevents empty or whitespace-only submissions with visible field error alert.
+   - Prevents duplicate submissions: submit button disabled and shows spinner while pending.
+   - Staff-only toggle: Checkbox to mark comment as an internal note, rendered **only** when `user.role === 'AGENT' || user.role === 'ADMIN'`. Customers never see this option.
+   - On success: clears form state, displays confirmation indicator, and automatically invalidates `commentKeys.list(ticketId)` to instantly update the thread.
+
+4. **Routing & Fallback Handling:**
+   - Created `apps/web/src/pages/TicketDetailPage.tsx` and updated `apps/web/src/App.tsx` registering `<Route path="/tickets/:ticketId" element={<TicketDetailPage />} />`.
+   - Not-Found (404) Handling: Dedicated 404 card when ticket does not exist or user lacks access.
+   - Invalid ID Handling: Graceful handling if ticket ID is missing.
+   - Network / API Error: Alert with retry button triggering `refetchTicket()`.
+
+### 4. Files Created and Modified
+#### Created:
+- `apps/web/src/features/tickets/components/TicketDetail.tsx`
+- `apps/web/src/pages/TicketDetailPage.tsx`
+- `apps/web/tests/TicketDetail.test.tsx`
+
+#### Modified:
+- `apps/web/src/features/tickets/components/index.ts` (re-exported `TicketDetail`)
+- `apps/web/src/App.tsx` (registered `/tickets/:ticketId` route)
+- `docs/prompt-journal.md` (appended Day 14 Stage 4B entry)
+
+### 5. Automated Tests Added & Verification Results
+Added `apps/web/tests/TicketDetail.test.tsx` with 11 automated Vitest tests:
+1. `renders accessible loading indicator while fetching ticket details`
+2. `renders ticket title, description, status, priority, category, assignee, requester, and timestamps`
+3. `renders not-found state when backend returns 404 error`
+4. `renders error state on API failure and retries on button click`
+5. `renders conversation history with author names, roles, timestamps, and internal note styling`
+6. `renders empty comments message when ticket has 0 comments`
+7. `submits a new comment, clears textarea, and invalidates comments cache`
+8. `prevents submitting whitespace-only comments and displays error`
+9. `displays server error message when comment creation fails`
+10. `shows internal note toggle for AGENT role but hides it for CUSTOMER role`
+11. `navigates back to /tickets when back link is clicked`
+
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm test -- --run
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/components.ui.test.tsx (24 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/TicketDetail.test.tsx (11 tests)
+ ✓ tests/TicketList.test.tsx (11 tests)
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  9 passed (9)
+      Tests  96 passed (96)
+   Duration  2.02s
+
+$ npm run build
+tsc -b && vite build -> 1666 modules transformed, dist/ generated in 1.10s
+```
