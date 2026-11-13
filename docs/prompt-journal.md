@@ -674,3 +674,753 @@ Protected GET /api/v1/tickets with Bearer token: 200 OK -> data count: 0
 Protected GET /api/v1/tickets without token: 401 UNAUTHORIZED -> "Authorization header is missing"
 Invalid credentials login: 401 UNAUTHORIZED -> "Invalid email or password"
 ```
+
+---
+
+## Entry 14 — Day 14 Stage 1: Shared Zod Schema and Centralized Ticket API Foundation
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 1)  
+
+### 1. Task / Context
+Implement the shared Zod schema integration between frontend and backend, comprehensive TypeScript contracts for tickets and comments, and centralized ticket API service functions in `apps/web/src/features/tickets/`. Enforce zero schema duplication, verify query parameter serialization, and author dedicated automated Vitest tests without modifying backend source code.
+
+### 2. Exact Prompts Used
+
+**Stage 1 Prompt:**
+> "Implement only the shared Zod schema integration, ticket/comment types, and centralized ticket API functions.
+> Git requirements:
+> - Repository: SupportDesk
+> - Create branch: feat/web-tickets-screen
+> - Base branch: feat/web-login-foundation
+> - Preserve all existing uncommitted and untracked files.
+> - Do not modify or stage supportdesk_messy_express_demo.js.
+> - Do not merge any PR.
+> Implementation tasks:
+> 1. Shared Zod integration: Use the exact backend createTicketBodySchema. Do not duplicate or rewrite the schema. Configure Vite and TypeScript path resolution safely for the shared backend schema.
+> 2. Ticket and comment types: Create apps/web/src/features/tickets/types.ts defining Ticket, TicketStatus, TicketPriority, Comment, ListTicketsQuery, Pagination metadata, and input types.
+> 3. Ticket API functions: Create apps/web/src/features/tickets/api/tickets.api.ts implementing listTickets, getTicketById, createTicket, updateTicket, listComments, createComment using api-client.ts.
+> 4. Tests: Add focused Vitest tests for shared schema import, query parameter serialization, API responses, error propagation, and endpoints."
+
+### 3. Summary of Implementation & Architecture
+1. **Shared Zod Schema Integration:**
+   - Instead of duplicating `createTicketBodySchema`, `apps/web` directly imports the exact schema from `apps/api/src/schemas/ticket.schema.ts`.
+   - Configured Vite path alias `@supportdesk/schemas` in `apps/web/vite.config.ts`.
+   - Configured TypeScript paths mapping `@supportdesk/schemas/*` and updated `"include"` in `apps/web/tsconfig.json`.
+   - Installed matching `zod` (`4.6.7`) and `@hookform/resolvers` in `apps/web/package.json`.
+2. **Contracts & Domain Types (`apps/web/src/features/tickets/types.ts`):**
+   - Re-exported inferred schema types `CreateTicketInput`, `UpdateTicketInput`, `ListTicketsQuery` directly from backend schema.
+   - Defined `ListTicketsParams` as `z.input<typeof listTicketsQuerySchema>` to allow flexible client-side filter queries before server-side defaults apply.
+   - Defined complete domain models: `Ticket`, `TicketStatus`, `TicketPriority`, `Comment`, `UserSummary`, `PaginationMeta`, `PaginatedTicketsResponse`, `CreateCommentInput`.
+3. **Centralized Ticket API Service (`apps/web/src/features/tickets/api/tickets.api.ts`):**
+   - Extended `apps/web/src/lib/api-client.ts` with `apiRequestWithMeta<T>` to preserve backend response metadata (`pagination: { page, limit, total, totalPages }`).
+   - Implemented `buildQueryString` supporting `page`, `limit`, `status`, `priority`, `category`, `search`, `sortBy`, `sortOrder`, and `assigneeId`, stripping empty/whitespace values.
+   - Implemented `listTickets`, `getTicketById`, `createTicket`, `updateTicket`, `listComments`, and `createComment`.
+   - Guaranteed security and contract fidelity: authentication tokens are attached automatically by the centralized client via `sessionStorage`, and internal comments are controlled strictly by backend RBAC rather than client filtering.
+4. **Focused Vitest Test Suite (`apps/web/tests/tickets.api.test.ts`):**
+   - 17 new automated tests covering:
+     - Shared schema import and validation (valid payload, title min 3, description min 5, update rejection of empty payloads).
+     - Query string serialization (empty, pagination, compound filters, whitespace trimming, sorting).
+     - Full mock API lifecycle for all 6 operations (`GET`, `POST`, `PATCH`).
+     - Error handling and propagation (`ApiError` with status codes 404, 403, 400).
+
+### 4. Files Created and Modified
+#### Created:
+- `apps/web/src/features/tickets/types.ts`
+- `apps/web/src/features/tickets/api/tickets.api.ts`
+- `apps/web/tests/tickets.api.test.ts`
+
+#### Modified:
+- `apps/web/package.json` (added `zod` 4.6.7 and `@hookform/resolvers`)
+- `apps/web/package-lock.json`
+- `apps/web/vite.config.ts` (added `@supportdesk/schemas` path alias)
+- `apps/web/tsconfig.json` (added `@supportdesk/schemas/*` path mapping and include)
+- `apps/web/src/lib/api-client.ts` (added `apiRequestWithMeta<T>`)
+- `docs/prompt-journal.md` (appended Day 14 Stage 1 entry)
+
+### 5. Problems Encountered and Solutions
+1. **Zod Output vs. Input Query Types (`TS2345`):**
+   - *Problem:* `listTicketsQuerySchema` defines `.default(...)` for `page`, `limit`, `sortBy`, and `sortOrder`. In Zod, `z.infer` evaluates to the parsed output type (where defaulted fields are required). Passing partial filter objects (e.g. `{ status: "OPEN" }`) caused a TypeScript type error.
+   - *Solution:* Defined `ListTicketsParams = z.input<typeof listTicketsQuerySchema>`, accurately typing client-side query parameters before backend parsing applies defaults.
+2. **Accessing Pagination Metadata from Envelope:**
+   - *Problem:* `apiRequest<T>` unwrapped only `payload.data`, dropping `payload.meta.pagination`.
+   - *Solution:* Added `apiRequestWithMeta<T>` in `api-client.ts`, refactoring the core request logic into `executeRequest` without breaking backward compatibility for any existing Day 13 endpoints or tests.
+
+### 6. Tests Executed & Actual Output
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm run build
+tsc -b && vite build -> 1653 modules transformed, dist/ generated in 1.22s
+
+$ npm test -- --run
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  5 passed (5)
+      Tests  40 passed (40)
+   Duration  2.01s
+```
+
+---
+
+## Entry 15 — Day 14 Stage 2: TanStack Query Hooks for Tickets & Comments
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 2)  
+
+### 1. Task / Context
+Implement TanStack Query v5 custom hooks for ticket querying, detail fetching, ticket mutations, comment listing, and comment creation. Establish a centralized query key factory with filter/pagination encapsulation, cache invalidation strategies, and authentication session isolation.
+
+### 2. Exact Prompts Used
+
+**Stage 2 Prompt:**
+> "Implement the TanStack Query hooks for tickets and comments using the Stage 1 API functions.
+> Requirements:
+> 1. Query key architecture: Create a centralized query key factory. Ticket list keys must include all relevant filters and pagination parameters. Ticket detail keys must include ticket ID. Comment keys must include ticket ID.
+> 2. Implement hooks under apps/web/src/features/tickets/hooks/:
+>    - useTickets.ts: Fetch paginated tickets using listTickets.
+>    - useTicket.ts: Fetch ticket by ID with disabled state when ID is missing.
+>    - useTicketMutations.ts: useCreateTicket (invalidates lists) and useUpdateTicket (updates detail cache and invalidates lists).
+>    - useComments.ts: useComments query and useCreateComment mutation (invalidates comments).
+> 3. Tests: Add focused hook tests covering list success/error, key isolation, detail success/disabled, mutation invalidations, and cache isolation across logout."
+
+### 3. Query Key Architecture & Cache Invalidation
+- **Query Key Factory (`queryKeys.ts`):**
+  - `ticketKeys.all`: `["tickets"]`
+  - `ticketKeys.lists()`: `["tickets", "list"]`
+  - `ticketKeys.list(params)`: `["tickets", "list", params ?? {}]`
+  - `ticketKeys.details()`: `["tickets", "detail"]`
+  - `ticketKeys.detail(id)`: `["tickets", "detail", id]`
+  - `commentKeys.all`: `["comments"]`
+  - `commentKeys.lists()`: `["comments", "list"]`
+  - `commentKeys.list(ticketId)`: `["comments", "list", ticketId]`
+- **Cache Invalidation Strategy:**
+  - `useCreateTicket`: On success, calls `queryClient.invalidateQueries({ queryKey: ticketKeys.lists() })` ensuring newly created tickets appear in all ticket list views.
+  - `useUpdateTicket`: On success, calls `queryClient.setQueryData(ticketKeys.detail(id), updatedTicket)`, updates the single ticket detail in cache, and calls `queryClient.invalidateQueries` on `ticketKeys.detail(id)` and `ticketKeys.lists()`.
+  - `useCreateComment`: On success, calls `queryClient.invalidateQueries({ queryKey: commentKeys.list(ticketId) })`, automatically refetching the chronological comment thread.
+- **Authentication Session & Cache Isolation:**
+  - In `apps/web/src/lib/auth.tsx`, the `logout()` callback explicitly executes `queryClient.clear()`.
+  - This completely purges all in-memory query caches when a user signs out, preventing cross-account leakage (e.g. customer data lingering in cache when switching to an agent account). Verified through automated testing.
+
+### 4. Zod Resolver Compatibility Finding
+- Inspected installed `@hookform/resolvers` (`^4.1.3`) with `zod` (`4.6.7`).
+- Verified execution: `zodResolver(schema)` correctly parses and validates schemas under Zod 4, producing expected `{ errors }` on invalid payloads and `{ values }` on valid data without warnings or runtime breaks.
+
+### 5. Files Created and Modified
+#### Created:
+- `apps/web/src/features/tickets/hooks/queryKeys.ts`
+- `apps/web/src/features/tickets/hooks/useTickets.ts`
+- `apps/web/src/features/tickets/hooks/useTicket.ts`
+- `apps/web/src/features/tickets/hooks/useTicketMutations.ts`
+- `apps/web/src/features/tickets/hooks/useComments.ts`
+- `apps/web/src/features/tickets/hooks/index.ts`
+- `apps/web/tests/ticket.hooks.test.tsx`
+
+#### Modified:
+- `docs/prompt-journal.md` (appended Day 14 Stage 2 entry)
+
+### 6. Tests Executed & Actual Output
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm run build
+tsc -b && vite build -> 1653 modules transformed, dist/ generated in 1.15s
+
+$ npm test -- --run
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  6 passed (6)
+      Tests  50 passed (50)
+   Duration  2.39s
+```
+
+---
+
+## Entry 16 — Day 14 Stage 3: Reusable & Accessible UI Component Suite
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 3)  
+
+### 1. Task / Context
+Implement accessible, reusable UI atoms and ticket badges for SupportDesk ticket screens (Badge, Select, Textarea, Modal, StatusBadge, PriorityBadge) following the design conventions of the existing dashboard. Ensure full keyboard accessibility, ARIA associations, responsive styles, and author comprehensive Vitest component tests.
+
+### 2. Exact Prompts Used
+
+**Stage 3 Prompt:**
+> "Build reusable, accessible UI components required for the Ticket List, Ticket Detail, Create Ticket, and Comment screens.
+> Create:
+> - Badge.tsx (neutral, success, warning, danger, brand variants)
+> - Select.tsx (label, options, placeholder, disabled, error, accessible attributes)
+> - Textarea.tsx (label, placeholder, rows, disabled, error, optional character counter)
+> - Modal.tsx (accessible dialog, close button, escape key listener, backdrop click, focus management, body scroll lock)
+> - StatusBadge.tsx (OPEN, IN_PROGRESS, WAITING_ON_CUSTOMER, RESOLVED, CLOSED)
+> - PriorityBadge.tsx (P1, P2, P3, P4)
+> Design requirements: Follow existing SupportDesk dashboard design, consistent spacing, readable contrast, focus indicators.
+> Tests: Add tests covering badge variants, 5 statuses, 4 priorities, select label/error/disabled, textarea label/error/counter, modal open/close, escape-key, modal accessibility."
+
+### 3. Summary of Implementation & Components Created
+1. **`Badge.tsx` (`src/components/ui/Badge.tsx`):**
+   - Lightweight, accessible pill component supporting 5 visual variants: `neutral`, `success`, `warning`, `danger`, and `brand` with sizes `sm` and `md`.
+2. **`Select.tsx` (`src/components/ui/Select.tsx`):**
+   - Accessible form dropdown supporting options array or native `<option>` children.
+   - Chevron icon indicator, `aria-invalid`, `aria-describedby` linking to error or helper text, and disabled states matching `Input.tsx`.
+3. **`Textarea.tsx` (`src/components/ui/Textarea.tsx`):**
+   - Multi-line input with forwardRef, responsive resize, dynamic character counter (`showCount` + `maxLength`), and accessible error alerts.
+4. **`Modal.tsx` (`src/components/ui/Modal.tsx`):**
+   - Pure React accessible dialog (`role="dialog"`, `aria-modal="true"`, `aria-labelledby`, `aria-describedby`).
+   - Backdrop overlay with blur, ESC-key keyboard listener, backdrop click dismiss, body scroll lock/unlock on mount/unmount, and header close button. Zero external library bloat.
+5. **`StatusBadge.tsx` (`src/features/tickets/components/StatusBadge.tsx`):**
+   - Color-coded badges with dot indicators for all 5 verified backend statuses:
+     - `OPEN`: Brand blue
+     - `IN_PROGRESS`: Amber
+     - `WAITING_ON_CUSTOMER`: Neutral gray
+     - `RESOLVED`: Emerald green
+     - `CLOSED`: Neutral slate
+6. **`PriorityBadge.tsx` (`src/features/tickets/components/PriorityBadge.tsx`):**
+   - Distinct severity styling for all 4 priorities:
+     - `P1`: Red ("P1 — Critical")
+     - `P2`: Orange ("P2 — High")
+     - `P3`: Blue ("P3 — Medium")
+     - `P4`: Gray ("P4 — Low")
+
+### 4. Files Created and Modified
+#### Created:
+- `apps/web/src/components/ui/Badge.tsx`
+- `apps/web/src/components/ui/Select.tsx`
+- `apps/web/src/components/ui/Textarea.tsx`
+- `apps/web/src/components/ui/Modal.tsx`
+- `apps/web/src/features/tickets/components/StatusBadge.tsx`
+- `apps/web/src/features/tickets/components/PriorityBadge.tsx`
+- `apps/web/tests/components.ui.test.tsx`
+
+#### Modified:
+- `docs/prompt-journal.md` (appended Day 14 Stage 3 entry)
+
+### 5. Tests Executed & Actual Output
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm run build
+tsc -b && vite build -> 1653 modules transformed, dist/ generated in 1.39s
+
+$ npm test -- --run
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/components.ui.test.tsx (17 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  7 passed (7)
+      Tests  67 passed (67)
+   Duration  1.93s
+```
+
+
+---
+
+## Entry 17 — Day 14 Stage 3: Modal Accessibility Verification & Focus Trapping
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 3 Verification)  
+
+### 1. Task / Context
+Perform an accessibility audit and verification on `apps/web/src/components/ui/Modal.tsx` prior to Stage 4 screen implementation. Address verified accessibility gaps regarding focus management, focus trapping, focus restoration upon closing, background interaction containment, and dismissal controls without introducing third-party modal dependencies or redesigning the component.
+
+### 2. Exact Prompts Used
+
+**Accessibility Verification Prompt:**
+> "Before starting Stage 4, audit the existing Modal.tsx implementation.
+> Important: Do not redesign or rewrite the entire component. Preserve the existing UI and functionality.
+> Verify these behaviours:
+> 1. When the modal opens, focus moves inside it.
+> 2. Pressing Tab and Shift+Tab keeps focus inside the modal.
+> 3. When the modal closes, focus returns to the element that opened it.
+> 4. Background content cannot be interacted with while the modal is open.
+> 5. Escape closes the modal when dismissal is enabled.
+> 6. Event listeners and body styles are cleaned up correctly when the modal closes or unmounts.
+> Implementation rules:
+> - Make only the changes necessary to address verified gaps.
+> - Preserve existing component props and API unless a change is essential.
+> - Avoid introducing a new dependency unless genuinely required.
+> - Do not modify ticket API functions, hooks, backend code, or unrelated components.
+> Tests:
+> Add or update tests for focus trapping, focus restoration, and background isolation."
+
+### 3. Identified Accessibility Gaps & Implementation Details
+1. **Focus Initialization:**
+   - *Previous Gap:* The modal only focused the outer container element (`modalRef.current?.focus()`).
+   - *Fix:* When the modal opens, it queries for interactive elements (`a[href]`, `button`, `input`, `select`, `textarea`, `[tabindex]`). It prioritizes elements marked with `[autofocus]` or `[data-autofocus]`, then falls back to the first interactive element (such as the Close button), and finally to the container itself if no interactive elements exist.
+2. **Focus Trapping (`Tab` & `Shift+Tab`):**
+   - *Previous Gap:* Tab and Shift+Tab keys bled out of the modal into background DOM elements.
+   - *Fix:* Added keyboard event handler for `Tab`:
+     - Pressing `Tab` on the last focusable element wraps focus back to the first focusable element.
+     - Pressing `Shift+Tab` on the first focusable element wraps focus back to the last focusable element.
+     - Pressing `Tab` or `Shift+Tab` when focus is outside the modal immediately pulls focus back inside the modal dialog.
+3. **Focus Restoration on Close/Unmount:**
+   - *Previous Gap:* Closing the modal left focus stranded at `document.body`.
+   - *Fix:* Captured `triggerElementRef.current = document.activeElement` when the modal opens. On unmount or when `isOpen` transitions to `false`, the cleanup hook safely restores focus to `triggerElementRef.current?.focus()`.
+4. **Background Isolation:**
+   - *Previous Gap:* Background DOM elements could still receive focus if clicked or navigated to externally.
+   - *Fix:* Added a global `focusin` listener that intercepts any external focus events while the modal is open and immediately bounces focus back into the modal dialog. In conjunction with `aria-modal="true"`, full-viewport backdrop click interception, and `overflow: hidden`, background content cannot be interacted with.
+5. **Dismissal Controls & Cleanup:**
+   - Added optional `closeOnEscape?: boolean` (default `true`) and `closeOnBackdropClick?: boolean` (default `true`) to allow controllable dismissal.
+   - Verified that all event listeners (`keydown`, `focusin`) and body style overrides (`document.body.style.overflow`) are cleanly removed and restored upon closing or unmounting.
+
+### 4. Files Modified
+- `apps/web/src/components/ui/Modal.tsx`
+- `apps/web/tests/components.ui.test.tsx`
+- `docs/prompt-journal.md`
+
+### 5. Tests Executed & Actual Output
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm run build
+tsc -b && vite build -> 1653 modules transformed, dist/ generated in 1.18s
+
+$ npm test -- --run
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/components.ui.test.tsx (24 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  7 passed (7)
+      Tests  74 passed (74)
+   Duration  1.66s
+```
+
+
+---
+
+## Entry 18 — Day 14 Stage 4A: Ticket List Screen
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 4A)  
+
+### 1. Task / Context
+Implement the production-grade Ticket List Screen using the existing SupportDesk frontend architecture, TanStack Query hooks, and reusable UI components. Deliver a responsive table and card view, server-side pagination with backend metadata, live search, status and priority filtering, filter clearing, empty/no-results/error/loading states, and detail route navigation without inventing unsupported backend endpoints or doing insecure client-side filtering.
+
+### 2. Exact Prompts Used
+
+**Stage 4A Prompt:**
+> "Implement the Ticket List Screen using the existing frontend architecture.
+> Requirements:
+> 1. Fetch tickets through the existing useTickets hook.
+> 2. Render a responsive ticket list/table.
+> 3. Display: Ticket title, Ticket status, Priority, Category (when available), Creation date, Assignee (only when supported by actual API response).
+> 4. Use existing StatusBadge and PriorityBadge components.
+> 5. Add server-side pagination using the backend pagination metadata.
+> 6. Add search using the existing supported search filter.
+> 7. Add status and priority filters using only supported backend values.
+> 8. Ensure changing filters resets pagination to page 1.
+> 9. Ensure pagination changes fetch the correct server page.
+> 10. Add a clear-filters action.
+> 11. Clicking a ticket should navigate to its detail route, using existing routing conventions.
+> Step 3: Handle UI states (initial loading, background refetch, empty state, no-results state, error state with retry, pagination disabled states).
+> Step 4: Role and security considerations (CUSTOMER sees only their tickets via backend scoping; AGENT/ADMIN see workspace tickets; no client-side security filtering; no invented agent assignment dropdown).
+> Step 5: Tests (rendering, loading, empty, error, badges, search, filters, pagination, page resets, navigation, query hook usage)."
+
+### 3. Summary of Implementation & Features
+
+1. **Core Ticket List Screen (`apps/web/src/features/tickets/components/TicketList.tsx`):**
+   - Utilizes `useTickets({ page, limit: pageSize, status, priority, search })` with deep query key reactivity.
+   - Dual responsive layout:
+     - **Desktop Table View (`hidden md:block`):** Full tabular display featuring ticket details (title and description preview), status badge, priority badge, category badge, assignee indicator with avatar initial, formatted creation date, and interactive action link.
+     - **Mobile Card View (`divide-y md:hidden`):** Touch-friendly card listing retaining full information density and tap targets.
+   - Safe data rendering:
+     - Category displays as a subtle neutral badge when populated or em-dash (`—`) when null.
+     - Assignee displays the assigned agent's name (`ticket.assignee.name || ticket.assignee.email`) or an italicized "Unassigned" indicator when null. No fake assignment dropdowns invented.
+     - Creation date formatted cleanly with standard US English formatting (`Nov 12, 2026`).
+
+2. **Search, Filtering, and Resetting:**
+   - Search bar with clear button (`X`), submit trigger, and Enter key support.
+   - Status dropdown with backend enum values (`OPEN`, `IN_PROGRESS`, `WAITING_ON_CUSTOMER`, `RESOLVED`, `CLOSED`).
+   - Priority dropdown with backend enum values (`P1`, `P2`, `P3`, `P4`).
+   - Any change to search, status, or priority automatically resets pagination to page 1.
+   - Dedicated "Clear filters" action button visible whenever any filter is active, immediately resetting state and fetching default page 1 results.
+
+3. **Server-Side Pagination:**
+   - Powered by backend pagination metadata (`total`, `totalPages`, `page`, `limit`).
+   - Displays exact range (`Showing X to Y of Z tickets`) and page indicator (`Page X of Y`).
+   - "Previous" disabled on page 1 or during fetching.
+   - "Next" disabled on final page or during fetching.
+   - Navigating pages triggers server-side queries for the targeted page.
+
+4. **Robust UI States:**
+   - **Loading State:** Centered card with animated spinner and `role="status"` live region.
+   - **Background Refetch Indicator:** Subtle animated "Refreshing..." chip in the toolbar when background queries re-validate without flickering the table.
+   - **Empty State:** Distinct card view when zero tickets exist for the user/system.
+   - **No Results State:** Filter-specific empty view with an integrated "Clear all filters" CTA.
+   - **Error State:** Accessible error `Alert` showing the server error message with an interactive "Try again" retry button.
+
+5. **Routing Integration:**
+   - Created `apps/web/src/pages/TicketsPage.tsx` and updated `apps/web/src/App.tsx` routing `/tickets` directly to `TicketsPage`.
+   - Cleaned up obsolete `TicketsPlaceholderPage.tsx` from Day 13.
+   - Ticket titles, cards, and row action links navigate to `/tickets/${ticket.id}`.
+
+### 4. Files Created, Modified, and Deleted
+#### Created:
+- `apps/web/src/features/tickets/components/TicketList.tsx`
+- `apps/web/src/features/tickets/components/index.ts`
+- `apps/web/src/pages/TicketsPage.tsx`
+- `apps/web/tests/TicketList.test.tsx`
+
+#### Modified:
+- `apps/web/src/App.tsx` (switched `/tickets` route to `TicketsPage`)
+- `apps/web/src/components/layout/Sidebar.tsx` (typed navigation items)
+- `docs/prompt-journal.md` (appended Day 14 Stage 4A entry)
+
+#### Deleted:
+- `apps/web/src/pages/TicketsPlaceholderPage.tsx` (superseded by `TicketsPage`)
+
+### 5. Automated Tests Added & Verification Results
+Added `apps/web/tests/TicketList.test.tsx` containing 11 tests:
+1. `renders accessible loading indicator while fetching tickets`
+2. `renders tickets with title, status, priority, category, assignee, and dates`
+3. `renders empty state when no tickets are present and no filters active`
+4. `renders no-results state with clear-filters action when active filters return empty`
+5. `renders error state when API fails and allows retrying`
+6. `applies search query and resets pagination to page 1`
+7. `applies status and priority dropdown filters`
+8. `handles pagination navigation and disables boundary buttons`
+9. `resets page to 1 when status filter changes from page 2`
+10. `resets all active filters and restores page 1 when clear-filters is clicked`
+11. `navigates to /tickets/:id when clicking on ticket title or row`
+
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm test -- --run
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/components.ui.test.tsx (24 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/TicketList.test.tsx (11 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  8 passed (8)
+      Tests  85 passed (85)
+   Duration  1.77s
+
+$ npm run build
+tsc -b && vite build -> 1661 modules transformed, dist/ generated in 1.09s
+```
+
+
+---
+
+## Entry 19 — Day 14 Stage 4B: Ticket Detail Screen & Conversation Thread
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 4B)  
+
+### 1. Task / Context
+Implement the production-grade Ticket Detail Screen under `apps/web/` on the dedicated feature branch `feat/web-ticket-detail-screen`. Incorporate full ticket metadata presentation (title, description, status, priority, category, requester, assignee, timestamps, SLA), conversation history (comments thread with customer vs. staff role badges and internal note indicators), and interactive comment submission with validation, loading states, and automatic TanStack Query cache invalidation.
+
+### 2. Exact Prompts Used
+
+**Stage 4B Prompt:**
+> "Create a complete ticket detail experience.
+> A. Ticket Detail Page: Navigate from ticket list to /tickets/:ticketId. Display: Ticket ID, Ticket title, Full description, Status, Priority, Category (if available), Customer information (according to RBAC), Assigned agent (if available), Created date, Last updated date.
+> B. Ticket Information Layout: Responsive layout (Main content area: title, description, metadata, comments history, add comment section; Sidebar: status, priority, assigned agent, customer details, timestamps).
+> C. Comments and Conversation History: Integrate comments API and TanStack Query hooks. Display content, author, role, timestamp, chronological history. Distinguish customer and agent comments. Handle empty, loading, and error states.
+> D. Add Comment Functionality: Textarea, submit button, empty validation, prevent duplicate submissions, loading state, display API errors, clear on success, invalidate cache.
+> E. Navigation: Back to tickets, invalid ticket ID handling, 404 not-found state, error state with retry.
+> Testing & Verification: Comprehensive Vitest tests for all states, typecheck, build.
+> Branch: feat/web-ticket-detail-screen. Do not create a commit unless explicitly authorized."
+
+### 3. Summary of Implementation & Features
+
+1. **Ticket Detail Component (`apps/web/src/features/tickets/components/TicketDetail.tsx`):**
+   - Resolves ticket ID from URL route parameters (`/tickets/:ticketId`).
+   - Fetches single ticket via `useTicket(ticketId)`.
+   - Fetches conversation thread via `useComments(ticketId)`.
+   - Implements comment mutation via `useCreateComment(ticketId)`.
+   - **Responsive 2-Column Layout (`grid-cols-1 lg:grid-cols-3`):**
+     - **Main Content (2 cols):** Back link navigation, full ticket header, rich description card, conversation history section, and add response form.
+     - **Sidebar Overview (1 col):** Status badge, Priority badge, Category badge, Customer / Requester card (name, email, avatar), Assigned Agent card (name, email, avatar), and formatted timestamps (Created, Updated, SLA Due).
+
+2. **Conversation History & Comments Thread:**
+   - Chronological message list with author avatar, author name, and colored role badges:
+     - `AGENT` (blue pill badge)
+     - `ADMIN` (purple pill badge)
+     - `CUSTOMER` (emerald pill badge)
+   - Staff Internal Notes: Displays an amber `Internal Note` pill badge with a lock icon and subtle amber container styling (`bg-amber-50/70 border-amber-200`).
+   - Strict RBAC: Backend automatically excludes internal notes for customers; frontend respects this guarantee.
+   - Empty state: Clean dashed card encouraging users to start the conversation.
+   - Loading & Error states: Accessible spinner and error alert with retry button.
+
+3. **Add Comment Form & Mutations:**
+   - Accessible `Textarea` with character counter (`maxLength={5000}`) and dynamic validation.
+   - Prevents empty or whitespace-only submissions with visible field error alert.
+   - Prevents duplicate submissions: submit button disabled and shows spinner while pending.
+   - Staff-only toggle: Checkbox to mark comment as an internal note, rendered **only** when `user.role === 'AGENT' || user.role === 'ADMIN'`. Customers never see this option.
+   - On success: clears form state, displays confirmation indicator, and automatically invalidates `commentKeys.list(ticketId)` to instantly update the thread.
+
+4. **Routing & Fallback Handling:**
+   - Created `apps/web/src/pages/TicketDetailPage.tsx` and updated `apps/web/src/App.tsx` registering `<Route path="/tickets/:ticketId" element={<TicketDetailPage />} />`.
+   - Not-Found (404) Handling: Dedicated 404 card when ticket does not exist or user lacks access.
+   - Invalid ID Handling: Graceful handling if ticket ID is missing.
+   - Network / API Error: Alert with retry button triggering `refetchTicket()`.
+
+### 4. Files Created and Modified
+#### Created:
+- `apps/web/src/features/tickets/components/TicketDetail.tsx`
+- `apps/web/src/pages/TicketDetailPage.tsx`
+- `apps/web/tests/TicketDetail.test.tsx`
+
+#### Modified:
+- `apps/web/src/features/tickets/components/index.ts` (re-exported `TicketDetail`)
+- `apps/web/src/App.tsx` (registered `/tickets/:ticketId` route)
+- `docs/prompt-journal.md` (appended Day 14 Stage 4B entry)
+
+### 5. Automated Tests Added & Verification Results
+Added `apps/web/tests/TicketDetail.test.tsx` with 11 automated Vitest tests:
+1. `renders accessible loading indicator while fetching ticket details`
+2. `renders ticket title, description, status, priority, category, assignee, requester, and timestamps`
+3. `renders not-found state when backend returns 404 error`
+4. `renders error state on API failure and retries on button click`
+5. `renders conversation history with author names, roles, timestamps, and internal note styling`
+6. `renders empty comments message when ticket has 0 comments`
+7. `submits a new comment, clears textarea, and invalidates comments cache`
+8. `prevents submitting whitespace-only comments and displays error`
+9. `displays server error message when comment creation fails`
+10. `shows internal note toggle for AGENT role but hides it for CUSTOMER role`
+11. `navigates back to /tickets when back link is clicked`
+
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm test -- --run
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/components.ui.test.tsx (24 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/TicketDetail.test.tsx (11 tests)
+ ✓ tests/TicketList.test.tsx (11 tests)
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  9 passed (9)
+      Tests  96 passed (96)
+   Duration  2.02s
+
+$ npm run build
+tsc -b && vite build -> 1666 modules transformed, dist/ generated in 1.10s
+```
+
+
+---
+
+## Entry 20 — Day 14 Stage 4C: Create Ticket Screen & Submission Flow
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 4C)  
+
+### 1. Task / Context
+Implement a production-grade Create Ticket experience integrated with the existing SupportDesk backend and frontend architecture on branch `feat/web-create-ticket`. Utilize the shared Zod schema `createTicketBodySchema` with React Hook Form and `@hookform/resolvers/zod`, provide comprehensive validation (required fields, whitespace rejections, character boundaries), handle loading and duplicate submission prevention, integrate TanStack Query cache invalidation, and ensure seamless navigation upon ticket registration.
+
+### 2. Architecture Decisions
+1. **Dedicated Page & Route Architecture:**
+   - Implemented `CreateTicket` component in `apps/web/src/features/tickets/components/CreateTicket.tsx` designed with optional callbacks (`onSuccess?: (ticket: Ticket) => void`, `onCancel?: () => void`) for maximum flexibility (embeddable inside Modals or standalone on Pages).
+   - Created `apps/web/src/pages/CreateTicketPage.tsx` registered at `/tickets/new` in `apps/web/src/App.tsx`.
+   - Placed `<Route path="/tickets/new" element={<CreateTicketPage />} />` immediately before `<Route path="/tickets/:ticketId" element={<TicketDetailPage />} />` to guarantee the static route takes precedence.
+   - Added a prominent "Create Ticket" action button on `apps/web/src/pages/TicketsPage.tsx` linking to `/tickets/new`.
+
+2. **Shared Zod Schema & Form Architecture:**
+   - Imported `createTicketBodySchema` directly from `@supportdesk/schemas/ticket.schema`.
+   - Integrated with React Hook Form using `zodResolver(createTicketBodySchema)` and typed input/output types (`CreateTicketFormInput` and `CreateTicketFormOutput`).
+   - Automatically handles whitespace trimming and minimum character requirements (title: 3–255 chars, description: 5–5000 chars, priority: enum default `P3`).
+   - Normalized `category`: trimmed and omitted (`undefined`) when empty to match backend Prisma schema expectations.
+
+3. **RBAC & API Contract Adherence:**
+   - Strict RBAC: Derives requester identity from session token on the backend.
+   - For customers, `assigneeId` is completely excluded from the payload, preventing the backend `ForbiddenError("Customers are not permitted to assign tickets to agents")`.
+   - Displays authenticated user context pill in the UI.
+
+4. **TanStack Query Mutation & Cache Invalidation:**
+   - Leveraged `useCreateTicket()` hook which triggers `POST /api/v1/tickets`.
+   - Automatically invalidates `ticketKeys.lists()` on success so ticket lists immediately display the newly created item upon navigating back.
+   - Navigates immediately to `/tickets/:id` (or executes `onSuccess(ticket)`).
+
+5. **Error & Loading Handling:**
+   - Disables submit and cancel buttons and displays loading indicator (`isPending`) to block duplicate submissions.
+   - Handles HTTP 400 (validation), 401 (session expired), 403 (forbidden), network connection failures (code `NETWORK_ERROR`), and unexpected server errors with dismissible alert banners.
+
+### 3. Files Created and Modified
+#### Created:
+- `apps/web/src/features/tickets/components/CreateTicket.tsx`
+- `apps/web/src/pages/CreateTicketPage.tsx`
+- `apps/web/tests/CreateTicket.test.tsx`
+
+#### Modified:
+- `apps/web/src/features/tickets/components/index.ts` (re-exported `CreateTicket`)
+- `apps/web/src/pages/TicketsPage.tsx` (added "Create Ticket" header button)
+- `apps/web/src/App.tsx` (registered `/tickets/new` route)
+- `docs/prompt-journal.md` (appended Day 14 Stage 4C entry)
+
+### 4. Automated Tests Added & Verification Results
+Added `apps/web/tests/CreateTicket.test.tsx` with 14 automated Vitest tests:
+1. `renders create ticket form with title, priority, category, description, and action buttons`
+2. `validates required fields on submission when fields are empty`
+3. `rejects whitespace-only title and description and shows validation errors`
+4. `submits valid form payload to API and navigates to ticket detail page`
+5. `omits category when left as empty selection`
+6. `disables submit and cancel buttons and displays loading text while submitting`
+7. `displays server validation error (HTTP 400) in error banner`
+8. `displays unauthorized error (HTTP 401) in error banner`
+9. `displays forbidden error (HTTP 403) in error banner`
+10. `displays network connection error when server is unreachable`
+11. `navigates back to tickets list when cancel button is clicked`
+12. `navigates back to tickets list when back-to-tickets link is clicked`
+13. `calls custom onSuccess and onCancel callbacks when provided`
+14. `invalidates tickets list queries after successful creation`
+
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm test -- --run
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/components.ui.test.tsx (24 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/TicketDetail.test.tsx (11 tests)
+ ✓ tests/CreateTicket.test.tsx (14 tests)
+ ✓ tests/TicketList.test.tsx (11 tests)
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  10 passed (10)
+      Tests  110 passed (110)
+   Duration  2.57s
+
+$ npm run build
+tsc -b && vite build -> 1767 modules transformed, dist/ generated in 1.28s
+```
+
+### 5. Known Limitations
+- The SupportDesk API does not currently offer a user-listing endpoint (`GET /api/v1/users`), so manual assignee selection during creation is intentionally omitted. Ticket assignments are performed via ticket updates or internal automated workflows.
+
+
+---
+
+## Entry 21 — Day 15 Stage 5: Full-Stack Integration Testing
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 15 (Stage 5)  
+
+### 1. Task / Context
+Perform a complete full-stack integration and acceptance verification of the SupportDesk frontend and backend on branch `feat/web-create-ticket`. Verify the actual application using the real API and live PostgreSQL database. Adhere to strict safety rules: zero code modifications unless defects are found and approved, zero database schema/migration modifications, no exposure of secrets/passwords/JWTs, preservation of untracked `supportdesk_messy_express_demo.js`, and no commit/push/merge.
+
+### 2. Environment Verification & Startup
+- **Docker & PostgreSQL 17:** Started Docker Desktop; verified container `supportdesk-postgres` (`postgres:17`) running healthy on port `5433`.
+- **Database Connectivity:** Validated Prisma migration status (`Database schema is up to date!`).
+- **Backend API Server:** Launched Express 5 backend server on `http://localhost:5001`. Verified `/health` endpoint returning `{ status: "ok" }`.
+- **Frontend Web Server:** Launched Vite dev server on `http://localhost:5173`.
+
+### 3. Acceptance Scenarios Executed (12 Scenarios)
+All 12 acceptance scenarios were executed against the live API and PostgreSQL database:
+1. `Login with valid credentials` &rarr; **PASS** (200 OK, valid JWT and user profile).
+2. `Invalid login shows a useful error` &rarr; **PASS** (401 UNAUTHORIZED, `"Invalid email or password"`).
+3. `Unauthenticated users cannot access protected ticket pages` &rarr; **PASS** (401 UNAUTHORIZED without token).
+4. `Ticket list loads from the backend` &rarr; **PASS** (200 OK, paginated payload with meta).
+5. `Ticket detail page loads the correct ticket` &rarr; **PASS** (200 OK, returns specific UUID record).
+6. `Customer can create a ticket` &rarr; **PASS** (201 Created, status `OPEN`, `createdById` bound to customer).
+7. `Newly created ticket appears in the ticket list` &rarr; **PASS** (Ticket immediately discoverable in list query).
+8. `Newly created ticket opens its detail page` &rarr; **PASS** (200 OK, metadata retrieved).
+9. `Customer can add a public comment` &rarr; **PASS** (201 Created with `isInternal: false`).
+10. `Internal notes are restricted to authorized staff` &rarr; **PASS** (Customer rejected with 403; Agent creates 201; Customer list omits internal notes; Agent list includes internal notes).
+11. `Customer cannot access another customer's ticket` &rarr; **PASS** (404 NOT_FOUND on foreign ticket and foreign comment post, enforcing anti-enumeration IDOR defense).
+12. `Logout clears authentication and protects private routes` &rarr; **PASS** (Cleared auth rejects requests with 401 UNAUTHORIZED).
+
+### 4. Regression Verification Results
+- **Backend Tests:**
+  - `npm run test:node`: **128 / 128 Passed** across 44 suites.
+  - `npm run test:jest`: **119 / 119 Passed** across 7 suites (including Supertest with real PostgreSQL).
+  - Total backend tests: **247 Passed**.
+- **Frontend Tests:**
+  - `npm test -- --run`: **110 / 110 Passed** across 10 test files.
+- **Typecheck & Production Builds:**
+  - Backend: `npm run typecheck` passed (0 errors); `npm run build` compiled into `dist/`.
+  - Frontend: `npm run typecheck` passed (0 errors); `npm run build` compiled 1767 modules into `dist/` in 1.41s.
+
+### 5. Artifacts Created
+- `docs/day-15-integration-test-report.md`
+- `docs/prompt-journal.md` (appended Entry 21)
+
+### 6. Git Status & Safety Confirmation
+- Current branch: `feat/web-create-ticket`
+- HEAD commit: `e7761b6`
+- Working tree: Only the new report and updated prompt-journal are present.
+- Preserved untracked file: `supportdesk_messy_express_demo.js` untouched.
+- Zero commits, pushes, or merges were executed.
+
+
+---
+
+## Entry 22 — Day 15 Stage 5B: Browser Acceptance Testing
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 15 (Stage 5B)  
+
+### 1. Task / Context
+Execute end-to-end browser acceptance testing of the live SupportDesk React UI against the live Express backend API and PostgreSQL database on branch `feat/web-create-ticket`. Verify real browser interactions for authentication, invalid credentials, protected route guards, ticket lists, ticket creation, ticket details, public comments, staff internal notes, and logout. Capture screenshots without exposing secrets or credentials.
+
+### 2. Browser Automation Methodology & Resolution
+- Google Chrome was not installed on the macOS host; the installed Chromium engine was Microsoft Edge (`Edg/157.0.4341.46`).
+- Started Edge with `--headless --remote-debugging-port=9222`.
+- Executed browser automation script over Chrome DevTools Protocol (CDP) WebSocket, driving real DOM elements, React Hook Form synthetic inputs, and TanStack Query mutations on `http://localhost:5173`.
+
+### 3. Browser Acceptance Results (10 Scenarios)
+1. `B1: Login Screen Rendering` &rarr; **PASS** (SupportDesk branding, email, password inputs, submit button; saved `01-login-screen.png`).
+2. `B2: Invalid Login Feedback` &rarr; **PASS** (Alert banner rendered with `"Sign in failed: Invalid email or password"`; saved `02-invalid-login-error.png`).
+3. `B3: Valid Login & Redirection` &rarr; **PASS** (Customer authenticated, `sessionStorage` populated, redirected to dashboard; saved `03-authenticated-dashboard.png`).
+4. `B4: Tickets List Rendering` &rarr; **PASS** (Loaded live tickets from backend into responsive cards/table with "Create Ticket" action button; saved `04-tickets-list-page.png`).
+5. `B5: Create Ticket Form & Navigation` &rarr; **PASS** (Navigated to `/tickets/new`, rendered form with Title, Priority, Category, Description).
+6. `B6: Ticket Form Submission` &rarr; **PASS** (Submitted new ticket, intercepted by live backend API, redirected to `/tickets/:id` with matching title and badges; saved `05-created-ticket-detail.png`).
+7. `B7: Add Public Comment` &rarr; **PASS** (Submitted response in comment textarea, rendered in conversation history with author and role badge; saved `06-comment-thread-updated.png`).
+8. `B8: Staff Internal Note Toggle (Customer)` &rarr; **PASS** (Checkbox hidden from customer DOM).
+9. `B9: Staff Role & Internal Notes (Agent)` &rarr; **PASS** (Agent view rendered `AGENT` badge, internal note toggle, and amber `Internal Note` lock badge in timeline; saved `08-agent-internal-note-thread.png`).
+10. `B10: Sign Out & Route Guard` &rarr; **PASS** (Header sign out cleared `sessionStorage`, redirected to `/login`, direct `/tickets` navigation bounced to `/login`; saved `07-logged-out-login-screen.png`).
+
+### 4. Git Status & Safety Confirmation
+- Current branch: `feat/web-create-ticket`
+- HEAD commit: `e7761b6`
+- Working tree: Documentation updated (`docs/day-15-integration-test-report.md` and `docs/prompt-journal.md`).
+- Application code untouched (0 code changes).
+- Preserved untracked file: `supportdesk_messy_express_demo.js`.
+- Zero commits, pushes, or merges performed.

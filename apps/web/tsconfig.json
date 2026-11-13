@@ -14,12 +14,18 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Path Aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@supportdesk/schemas/*": ["../api/src/schemas/*"]
+    },
+
     /* Linting / Strictness */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "tests", "vite.config.ts", "../api/src/schemas/**/*"]
 }
 
