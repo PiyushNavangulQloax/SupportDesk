@@ -213,5 +213,173 @@ describe("Reusable UI Components (Stage 3)", () => {
       expect(dialog).toHaveAttribute("aria-labelledby");
       expect(dialog).toHaveAttribute("aria-describedby");
     });
+
+    // 11. Initial focus management
+    it("moves focus inside the modal on open (prioritizing autofocus or first focusable element)", () => {
+      // With autofocus
+      const { unmount } = render(
+        <Modal isOpen={true} onClose={() => {}} title="Autofocus Test">
+          <input data-testid="regular-input" />
+          <button data-testid="autofocus-btn" autoFocus>
+            Action
+          </button>
+        </Modal>
+      );
+      expect(screen.getByTestId("autofocus-btn")).toHaveFocus();
+      unmount();
+
+      // Without autofocus element, focuses the first focusable element (close button)
+      render(
+        <Modal isOpen={true} onClose={() => {}} title="First Element Focus Test">
+          <button data-testid="inner-btn">Inner</button>
+        </Modal>
+      );
+      expect(screen.getByLabelText("Close dialog")).toHaveFocus();
+    });
+
+    // 12. Focus trap: Tab key cycles forward from last to first element
+    it("traps focus inside the modal when Tab is pressed on the last element", () => {
+      render(
+        <Modal isOpen={true} onClose={() => {}} title="Tab Trap Forward">
+          <input data-testid="input-1" />
+          <button data-testid="btn-last">Last Button</button>
+        </Modal>
+      );
+
+      const closeBtn = screen.getByLabelText("Close dialog");
+      const lastBtn = screen.getByTestId("btn-last");
+
+      lastBtn.focus();
+      expect(lastBtn).toHaveFocus();
+
+      // Press Tab on the last element -> should wrap back to first element (closeBtn)
+      fireEvent.keyDown(document, { key: "Tab" });
+      expect(closeBtn).toHaveFocus();
+    });
+
+    // 13. Focus trap: Shift+Tab key cycles backward from first to last element
+    it("traps focus inside the modal when Shift+Tab is pressed on the first element", () => {
+      render(
+        <Modal isOpen={true} onClose={() => {}} title="Tab Trap Backward">
+          <input data-testid="input-1" />
+          <button data-testid="btn-last">Last Button</button>
+        </Modal>
+      );
+
+      const closeBtn = screen.getByLabelText("Close dialog");
+      const lastBtn = screen.getByTestId("btn-last");
+
+      closeBtn.focus();
+      expect(closeBtn).toHaveFocus();
+
+      // Press Shift+Tab on the first element -> should wrap to last element
+      fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+      expect(lastBtn).toHaveFocus();
+    });
+
+    // 14. Focus restoration to trigger element on close
+    it("restores focus to the triggering element when the modal closes", () => {
+      const triggerBtn = document.createElement("button");
+      triggerBtn.textContent = "Open Modal Trigger";
+      document.body.appendChild(triggerBtn);
+      triggerBtn.focus();
+      expect(triggerBtn).toHaveFocus();
+
+      const { rerender } = render(
+        <Modal isOpen={true} onClose={() => {}} title="Restoration Test">
+          <p>Modal Content</p>
+        </Modal>
+      );
+
+      // Focus should now be inside modal
+      expect(screen.getByLabelText("Close dialog")).toHaveFocus();
+
+      // Close modal
+      rerender(
+        <Modal isOpen={false} onClose={() => {}} title="Restoration Test">
+          <p>Modal Content</p>
+        </Modal>
+      );
+
+      // Focus should be restored back to triggerBtn
+      expect(triggerBtn).toHaveFocus();
+      document.body.removeChild(triggerBtn);
+    });
+
+    // 15. Background content isolation (redirects external focus back to modal)
+    it("keeps focus contained when focus attempts to leave the modal", () => {
+      const backgroundInput = document.createElement("input");
+      backgroundInput.setAttribute("data-testid", "background-input");
+      document.body.appendChild(backgroundInput);
+
+      render(
+        <Modal isOpen={true} onClose={() => {}} title="Background Isolation">
+          <button data-testid="inside-btn">Inside</button>
+        </Modal>
+      );
+
+      // Attempt to focus background element while modal is open
+      backgroundInput.focus();
+
+      // Should immediately redirect focus back into the modal
+      expect(screen.getByLabelText("Close dialog")).toHaveFocus();
+      document.body.removeChild(backgroundInput);
+    });
+
+    // 16. Dismissal controls (closeOnEscape & closeOnBackdropClick)
+    it("respects closeOnEscape=false and closeOnBackdropClick=false", () => {
+      const handleClose = vi.fn();
+      render(
+        <Modal
+          isOpen={true}
+          onClose={handleClose}
+          title="Dismissal Disabled Test"
+          closeOnEscape={false}
+          closeOnBackdropClick={false}
+        >
+          <div>Content</div>
+        </Modal>
+      );
+
+      // Escape should not trigger onClose
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(handleClose).not.toHaveBeenCalled();
+
+      // Backdrop click should not trigger onClose
+      const backdrop = screen.getByTestId("modal-backdrop");
+      fireEvent.click(backdrop);
+      expect(handleClose).not.toHaveBeenCalled();
+    });
+
+    // 17. Body overflow scroll lock and cleanup
+    it("locks body overflow when open and restores it upon closing or unmounting", () => {
+      document.body.style.overflow = "visible";
+
+      const { rerender, unmount } = render(
+        <Modal isOpen={true} onClose={() => {}} title="Scroll Lock Test">
+          <div>Content</div>
+        </Modal>
+      );
+
+      expect(document.body.style.overflow).toBe("hidden");
+
+      rerender(
+        <Modal isOpen={false} onClose={() => {}} title="Scroll Lock Test">
+          <div>Content</div>
+        </Modal>
+      );
+
+      expect(document.body.style.overflow).toBe("visible");
+
+      // Verify unmount cleanup as well
+      rerender(
+        <Modal isOpen={true} onClose={() => {}} title="Scroll Lock Test 2">
+          <div>Content</div>
+        </Modal>
+      );
+      expect(document.body.style.overflow).toBe("hidden");
+      unmount();
+      expect(document.body.style.overflow).toBe("visible");
+    });
   });
 });

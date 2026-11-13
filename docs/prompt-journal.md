@@ -931,3 +931,82 @@ $ npm test -- --run
       Tests  67 passed (67)
    Duration  1.93s
 ```
+
+
+---
+
+## Entry 17 — Day 14 Stage 3: Modal Accessibility Verification & Focus Trapping
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 3 Verification)  
+
+### 1. Task / Context
+Perform an accessibility audit and verification on `apps/web/src/components/ui/Modal.tsx` prior to Stage 4 screen implementation. Address verified accessibility gaps regarding focus management, focus trapping, focus restoration upon closing, background interaction containment, and dismissal controls without introducing third-party modal dependencies or redesigning the component.
+
+### 2. Exact Prompts Used
+
+**Accessibility Verification Prompt:**
+> "Before starting Stage 4, audit the existing Modal.tsx implementation.
+> Important: Do not redesign or rewrite the entire component. Preserve the existing UI and functionality.
+> Verify these behaviours:
+> 1. When the modal opens, focus moves inside it.
+> 2. Pressing Tab and Shift+Tab keeps focus inside the modal.
+> 3. When the modal closes, focus returns to the element that opened it.
+> 4. Background content cannot be interacted with while the modal is open.
+> 5. Escape closes the modal when dismissal is enabled.
+> 6. Event listeners and body styles are cleaned up correctly when the modal closes or unmounts.
+> Implementation rules:
+> - Make only the changes necessary to address verified gaps.
+> - Preserve existing component props and API unless a change is essential.
+> - Avoid introducing a new dependency unless genuinely required.
+> - Do not modify ticket API functions, hooks, backend code, or unrelated components.
+> Tests:
+> Add or update tests for focus trapping, focus restoration, and background isolation."
+
+### 3. Identified Accessibility Gaps & Implementation Details
+1. **Focus Initialization:**
+   - *Previous Gap:* The modal only focused the outer container element (`modalRef.current?.focus()`).
+   - *Fix:* When the modal opens, it queries for interactive elements (`a[href]`, `button`, `input`, `select`, `textarea`, `[tabindex]`). It prioritizes elements marked with `[autofocus]` or `[data-autofocus]`, then falls back to the first interactive element (such as the Close button), and finally to the container itself if no interactive elements exist.
+2. **Focus Trapping (`Tab` & `Shift+Tab`):**
+   - *Previous Gap:* Tab and Shift+Tab keys bled out of the modal into background DOM elements.
+   - *Fix:* Added keyboard event handler for `Tab`:
+     - Pressing `Tab` on the last focusable element wraps focus back to the first focusable element.
+     - Pressing `Shift+Tab` on the first focusable element wraps focus back to the last focusable element.
+     - Pressing `Tab` or `Shift+Tab` when focus is outside the modal immediately pulls focus back inside the modal dialog.
+3. **Focus Restoration on Close/Unmount:**
+   - *Previous Gap:* Closing the modal left focus stranded at `document.body`.
+   - *Fix:* Captured `triggerElementRef.current = document.activeElement` when the modal opens. On unmount or when `isOpen` transitions to `false`, the cleanup hook safely restores focus to `triggerElementRef.current?.focus()`.
+4. **Background Isolation:**
+   - *Previous Gap:* Background DOM elements could still receive focus if clicked or navigated to externally.
+   - *Fix:* Added a global `focusin` listener that intercepts any external focus events while the modal is open and immediately bounces focus back into the modal dialog. In conjunction with `aria-modal="true"`, full-viewport backdrop click interception, and `overflow: hidden`, background content cannot be interacted with.
+5. **Dismissal Controls & Cleanup:**
+   - Added optional `closeOnEscape?: boolean` (default `true`) and `closeOnBackdropClick?: boolean` (default `true`) to allow controllable dismissal.
+   - Verified that all event listeners (`keydown`, `focusin`) and body style overrides (`document.body.style.overflow`) are cleanly removed and restored upon closing or unmounting.
+
+### 4. Files Modified
+- `apps/web/src/components/ui/Modal.tsx`
+- `apps/web/tests/components.ui.test.tsx`
+- `docs/prompt-journal.md`
+
+### 5. Tests Executed & Actual Output
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm run build
+tsc -b && vite build -> 1653 modules transformed, dist/ generated in 1.18s
+
+$ npm test -- --run
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/components.ui.test.tsx (24 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  7 passed (7)
+      Tests  74 passed (74)
+   Duration  1.66s
+```

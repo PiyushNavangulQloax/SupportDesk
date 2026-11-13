@@ -10,7 +10,19 @@ export interface ModalProps {
   children: React.ReactNode;
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl";
   className?: string;
+  closeOnEscape?: boolean;
+  closeOnBackdropClick?: boolean;
 }
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]:not([tabindex="-1"])',
+  'area[href]:not([tabindex="-1"])',
+  'input:not([disabled]):not([type="hidden"]):not([tabindex="-1"])',
+  'select:not([disabled]):not([tabindex="-1"])',
+  'textarea:not([disabled]):not([tabindex="-1"])',
+  'button:not([disabled]):not([tabindex="-1"])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(", ");
 
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -20,33 +32,136 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = "lg",
   className,
+  closeOnEscape = true,
+  closeOnBackdropClick = true,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  const triggerElementRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const closeOnEscapeRef = useRef(closeOnEscape);
   const titleId = React.useId();
   const descId = React.useId();
 
-  // Escape key listener & Body scroll lock
+  onCloseRef.current = onClose;
+  closeOnEscapeRef.current = closeOnEscape;
+
+  const getFocusableElements = (): HTMLElement[] => {
+    if (!modalRef.current) return [];
+    const elements = Array.from(
+      modalRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+    );
+    return elements.filter(
+      (el) =>
+        !el.hasAttribute("disabled") &&
+        el.getAttribute("aria-hidden") !== "true"
+    );
+  };
+
   useEffect(() => {
     if (!isOpen) return;
 
+    // 1. Capture previously active element if outside modal
+    if (!modalRef.current?.contains(document.activeElement)) {
+      triggerElementRef.current = (document.activeElement as HTMLElement) || null;
+    }
+
+    // 2. Lock body scroll
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    // 3. Move focus inside modal if not already focused inside
+    const focusable = getFocusableElements();
+    const autoFocusEl = focusable.find(
+      (el) =>
+        (el as unknown as { autofocus?: boolean }).autofocus ||
+        el.hasAttribute("autofocus") ||
+        el.hasAttribute("data-autofocus")
+    );
+
+    if (autoFocusEl) {
+      autoFocusEl.focus();
+    } else if (!modalRef.current?.contains(document.activeElement)) {
+      if (focusable.length > 0) {
+        focusable[0].focus();
+      } else {
+        modalRef.current?.focus();
+      }
+    }
+
+    // 4. Trap focus and handle escape
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
+      if (e.key === "Escape" && closeOnEscapeRef.current) {
+        e.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+
+      if (e.key === "Tab") {
+        const focusable = getFocusableElements();
+
+        if (focusable.length === 0) {
+          e.preventDefault();
+          modalRef.current?.focus();
+          return;
+        }
+
+        const firstElement = focusable[0];
+        const lastElement = focusable[focusable.length - 1];
+        const activeElement = document.activeElement;
+
+        if (e.shiftKey) {
+          // Backward tab: if on first element or outside modal, wrap to last
+          if (
+            activeElement === firstElement ||
+            !modalRef.current?.contains(activeElement)
+          ) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          // Forward tab: if on last element or outside modal, wrap to first
+          if (
+            activeElement === lastElement ||
+            !modalRef.current?.contains(activeElement)
+          ) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    // 5. Prevent focus from leaving modal to background elements
+    const handleFocusIn = (e: FocusEvent) => {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+        e.stopPropagation();
+        const focusable = getFocusableElements();
+        if (focusable.length > 0) {
+          focusable[0].focus();
+        } else {
+          modalRef.current.focus();
+        }
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    // Focus the modal container on open
-    modalRef.current?.focus();
+    document.addEventListener("focusin", handleFocusIn);
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("focusin", handleFocusIn);
       document.body.style.overflow = originalOverflow;
+
+      // Restore focus to the trigger element
+      if (
+        triggerElementRef.current &&
+        typeof triggerElementRef.current.focus === "function"
+      ) {
+        triggerElementRef.current.focus();
+      }
+      triggerElementRef.current = null;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -69,7 +184,7 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
+        onClick={closeOnBackdropClick ? onClose : undefined}
         aria-hidden="true"
         data-testid="modal-backdrop"
       />
