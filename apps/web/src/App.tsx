@@ -4,6 +4,7 @@ import { useAuth } from "./lib/auth";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { TicketsPage } from "./pages/TicketsPage";
+import { CreateTicketPage } from "./pages/CreateTicketPage";
 import { TicketDetailPage } from "./pages/TicketDetailPage";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
@@ -48,6 +49,7 @@ export const App: React.FC = () => {
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/tickets" element={<TicketsPage />} />
+        <Route path="/tickets/new" element={<CreateTicketPage />} />
         <Route path="/tickets/:ticketId" element={<TicketDetailPage />} />
       </Route>
 

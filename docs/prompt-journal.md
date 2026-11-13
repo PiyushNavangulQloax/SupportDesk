@@ -1237,3 +1237,98 @@ $ npm test -- --run
 $ npm run build
 tsc -b && vite build -> 1666 modules transformed, dist/ generated in 1.10s
 ```
+
+
+---
+
+## Entry 20 — Day 14 Stage 4C: Create Ticket Screen & Submission Flow
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 4C)  
+
+### 1. Task / Context
+Implement a production-grade Create Ticket experience integrated with the existing SupportDesk backend and frontend architecture on branch `feat/web-create-ticket`. Utilize the shared Zod schema `createTicketBodySchema` with React Hook Form and `@hookform/resolvers/zod`, provide comprehensive validation (required fields, whitespace rejections, character boundaries), handle loading and duplicate submission prevention, integrate TanStack Query cache invalidation, and ensure seamless navigation upon ticket registration.
+
+### 2. Architecture Decisions
+1. **Dedicated Page & Route Architecture:**
+   - Implemented `CreateTicket` component in `apps/web/src/features/tickets/components/CreateTicket.tsx` designed with optional callbacks (`onSuccess?: (ticket: Ticket) => void`, `onCancel?: () => void`) for maximum flexibility (embeddable inside Modals or standalone on Pages).
+   - Created `apps/web/src/pages/CreateTicketPage.tsx` registered at `/tickets/new` in `apps/web/src/App.tsx`.
+   - Placed `<Route path="/tickets/new" element={<CreateTicketPage />} />` immediately before `<Route path="/tickets/:ticketId" element={<TicketDetailPage />} />` to guarantee the static route takes precedence.
+   - Added a prominent "Create Ticket" action button on `apps/web/src/pages/TicketsPage.tsx` linking to `/tickets/new`.
+
+2. **Shared Zod Schema & Form Architecture:**
+   - Imported `createTicketBodySchema` directly from `@supportdesk/schemas/ticket.schema`.
+   - Integrated with React Hook Form using `zodResolver(createTicketBodySchema)` and typed input/output types (`CreateTicketFormInput` and `CreateTicketFormOutput`).
+   - Automatically handles whitespace trimming and minimum character requirements (title: 3–255 chars, description: 5–5000 chars, priority: enum default `P3`).
+   - Normalized `category`: trimmed and omitted (`undefined`) when empty to match backend Prisma schema expectations.
+
+3. **RBAC & API Contract Adherence:**
+   - Strict RBAC: Derives requester identity from session token on the backend.
+   - For customers, `assigneeId` is completely excluded from the payload, preventing the backend `ForbiddenError("Customers are not permitted to assign tickets to agents")`.
+   - Displays authenticated user context pill in the UI.
+
+4. **TanStack Query Mutation & Cache Invalidation:**
+   - Leveraged `useCreateTicket()` hook which triggers `POST /api/v1/tickets`.
+   - Automatically invalidates `ticketKeys.lists()` on success so ticket lists immediately display the newly created item upon navigating back.
+   - Navigates immediately to `/tickets/:id` (or executes `onSuccess(ticket)`).
+
+5. **Error & Loading Handling:**
+   - Disables submit and cancel buttons and displays loading indicator (`isPending`) to block duplicate submissions.
+   - Handles HTTP 400 (validation), 401 (session expired), 403 (forbidden), network connection failures (code `NETWORK_ERROR`), and unexpected server errors with dismissible alert banners.
+
+### 3. Files Created and Modified
+#### Created:
+- `apps/web/src/features/tickets/components/CreateTicket.tsx`
+- `apps/web/src/pages/CreateTicketPage.tsx`
+- `apps/web/tests/CreateTicket.test.tsx`
+
+#### Modified:
+- `apps/web/src/features/tickets/components/index.ts` (re-exported `CreateTicket`)
+- `apps/web/src/pages/TicketsPage.tsx` (added "Create Ticket" header button)
+- `apps/web/src/App.tsx` (registered `/tickets/new` route)
+- `docs/prompt-journal.md` (appended Day 14 Stage 4C entry)
+
+### 4. Automated Tests Added & Verification Results
+Added `apps/web/tests/CreateTicket.test.tsx` with 14 automated Vitest tests:
+1. `renders create ticket form with title, priority, category, description, and action buttons`
+2. `validates required fields on submission when fields are empty`
+3. `rejects whitespace-only title and description and shows validation errors`
+4. `submits valid form payload to API and navigates to ticket detail page`
+5. `omits category when left as empty selection`
+6. `disables submit and cancel buttons and displays loading text while submitting`
+7. `displays server validation error (HTTP 400) in error banner`
+8. `displays unauthorized error (HTTP 401) in error banner`
+9. `displays forbidden error (HTTP 403) in error banner`
+10. `displays network connection error when server is unreachable`
+11. `navigates back to tickets list when cancel button is clicked`
+12. `navigates back to tickets list when back-to-tickets link is clicked`
+13. `calls custom onSuccess and onCancel callbacks when provided`
+14. `invalidates tickets list queries after successful creation`
+
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm test -- --run
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/components.ui.test.tsx (24 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/TicketDetail.test.tsx (11 tests)
+ ✓ tests/CreateTicket.test.tsx (14 tests)
+ ✓ tests/TicketList.test.tsx (11 tests)
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  10 passed (10)
+      Tests  110 passed (110)
+   Duration  2.57s
+
+$ npm run build
+tsc -b && vite build -> 1767 modules transformed, dist/ generated in 1.28s
+```
+
+### 5. Known Limitations
+- The SupportDesk API does not currently offer a user-listing endpoint (`GET /api/v1/users`), so manual assignee selection during creation is intentionally omitted. Ticket assignments are performed via ticket updates or internal automated workflows.
