@@ -1332,3 +1332,95 @@ tsc -b && vite build -> 1767 modules transformed, dist/ generated in 1.28s
 
 ### 5. Known Limitations
 - The SupportDesk API does not currently offer a user-listing endpoint (`GET /api/v1/users`), so manual assignee selection during creation is intentionally omitted. Ticket assignments are performed via ticket updates or internal automated workflows.
+
+
+---
+
+## Entry 21 — Day 15 Stage 5: Full-Stack Integration Testing
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 15 (Stage 5)  
+
+### 1. Task / Context
+Perform a complete full-stack integration and acceptance verification of the SupportDesk frontend and backend on branch `feat/web-create-ticket`. Verify the actual application using the real API and live PostgreSQL database. Adhere to strict safety rules: zero code modifications unless defects are found and approved, zero database schema/migration modifications, no exposure of secrets/passwords/JWTs, preservation of untracked `supportdesk_messy_express_demo.js`, and no commit/push/merge.
+
+### 2. Environment Verification & Startup
+- **Docker & PostgreSQL 17:** Started Docker Desktop; verified container `supportdesk-postgres` (`postgres:17`) running healthy on port `5433`.
+- **Database Connectivity:** Validated Prisma migration status (`Database schema is up to date!`).
+- **Backend API Server:** Launched Express 5 backend server on `http://localhost:5001`. Verified `/health` endpoint returning `{ status: "ok" }`.
+- **Frontend Web Server:** Launched Vite dev server on `http://localhost:5173`.
+
+### 3. Acceptance Scenarios Executed (12 Scenarios)
+All 12 acceptance scenarios were executed against the live API and PostgreSQL database:
+1. `Login with valid credentials` &rarr; **PASS** (200 OK, valid JWT and user profile).
+2. `Invalid login shows a useful error` &rarr; **PASS** (401 UNAUTHORIZED, `"Invalid email or password"`).
+3. `Unauthenticated users cannot access protected ticket pages` &rarr; **PASS** (401 UNAUTHORIZED without token).
+4. `Ticket list loads from the backend` &rarr; **PASS** (200 OK, paginated payload with meta).
+5. `Ticket detail page loads the correct ticket` &rarr; **PASS** (200 OK, returns specific UUID record).
+6. `Customer can create a ticket` &rarr; **PASS** (201 Created, status `OPEN`, `createdById` bound to customer).
+7. `Newly created ticket appears in the ticket list` &rarr; **PASS** (Ticket immediately discoverable in list query).
+8. `Newly created ticket opens its detail page` &rarr; **PASS** (200 OK, metadata retrieved).
+9. `Customer can add a public comment` &rarr; **PASS** (201 Created with `isInternal: false`).
+10. `Internal notes are restricted to authorized staff` &rarr; **PASS** (Customer rejected with 403; Agent creates 201; Customer list omits internal notes; Agent list includes internal notes).
+11. `Customer cannot access another customer's ticket` &rarr; **PASS** (404 NOT_FOUND on foreign ticket and foreign comment post, enforcing anti-enumeration IDOR defense).
+12. `Logout clears authentication and protects private routes` &rarr; **PASS** (Cleared auth rejects requests with 401 UNAUTHORIZED).
+
+### 4. Regression Verification Results
+- **Backend Tests:**
+  - `npm run test:node`: **128 / 128 Passed** across 44 suites.
+  - `npm run test:jest`: **119 / 119 Passed** across 7 suites (including Supertest with real PostgreSQL).
+  - Total backend tests: **247 Passed**.
+- **Frontend Tests:**
+  - `npm test -- --run`: **110 / 110 Passed** across 10 test files.
+- **Typecheck & Production Builds:**
+  - Backend: `npm run typecheck` passed (0 errors); `npm run build` compiled into `dist/`.
+  - Frontend: `npm run typecheck` passed (0 errors); `npm run build` compiled 1767 modules into `dist/` in 1.41s.
+
+### 5. Artifacts Created
+- `docs/day-15-integration-test-report.md`
+- `docs/prompt-journal.md` (appended Entry 21)
+
+### 6. Git Status & Safety Confirmation
+- Current branch: `feat/web-create-ticket`
+- HEAD commit: `e7761b6`
+- Working tree: Only the new report and updated prompt-journal are present.
+- Preserved untracked file: `supportdesk_messy_express_demo.js` untouched.
+- Zero commits, pushes, or merges were executed.
+
+
+---
+
+## Entry 22 — Day 15 Stage 5B: Browser Acceptance Testing
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 15 (Stage 5B)  
+
+### 1. Task / Context
+Execute end-to-end browser acceptance testing of the live SupportDesk React UI against the live Express backend API and PostgreSQL database on branch `feat/web-create-ticket`. Verify real browser interactions for authentication, invalid credentials, protected route guards, ticket lists, ticket creation, ticket details, public comments, staff internal notes, and logout. Capture screenshots without exposing secrets or credentials.
+
+### 2. Browser Automation Methodology & Resolution
+- Google Chrome was not installed on the macOS host; the installed Chromium engine was Microsoft Edge (`Edg/157.0.4341.46`).
+- Started Edge with `--headless --remote-debugging-port=9222`.
+- Executed browser automation script over Chrome DevTools Protocol (CDP) WebSocket, driving real DOM elements, React Hook Form synthetic inputs, and TanStack Query mutations on `http://localhost:5173`.
+
+### 3. Browser Acceptance Results (10 Scenarios)
+1. `B1: Login Screen Rendering` &rarr; **PASS** (SupportDesk branding, email, password inputs, submit button; saved `01-login-screen.png`).
+2. `B2: Invalid Login Feedback` &rarr; **PASS** (Alert banner rendered with `"Sign in failed: Invalid email or password"`; saved `02-invalid-login-error.png`).
+3. `B3: Valid Login & Redirection` &rarr; **PASS** (Customer authenticated, `sessionStorage` populated, redirected to dashboard; saved `03-authenticated-dashboard.png`).
+4. `B4: Tickets List Rendering` &rarr; **PASS** (Loaded live tickets from backend into responsive cards/table with "Create Ticket" action button; saved `04-tickets-list-page.png`).
+5. `B5: Create Ticket Form & Navigation` &rarr; **PASS** (Navigated to `/tickets/new`, rendered form with Title, Priority, Category, Description).
+6. `B6: Ticket Form Submission` &rarr; **PASS** (Submitted new ticket, intercepted by live backend API, redirected to `/tickets/:id` with matching title and badges; saved `05-created-ticket-detail.png`).
+7. `B7: Add Public Comment` &rarr; **PASS** (Submitted response in comment textarea, rendered in conversation history with author and role badge; saved `06-comment-thread-updated.png`).
+8. `B8: Staff Internal Note Toggle (Customer)` &rarr; **PASS** (Checkbox hidden from customer DOM).
+9. `B9: Staff Role & Internal Notes (Agent)` &rarr; **PASS** (Agent view rendered `AGENT` badge, internal note toggle, and amber `Internal Note` lock badge in timeline; saved `08-agent-internal-note-thread.png`).
+10. `B10: Sign Out & Route Guard` &rarr; **PASS** (Header sign out cleared `sessionStorage`, redirected to `/login`, direct `/tickets` navigation bounced to `/login`; saved `07-logged-out-login-screen.png`).
+
+### 4. Git Status & Safety Confirmation
+- Current branch: `feat/web-create-ticket`
+- HEAD commit: `e7761b6`
+- Working tree: Documentation updated (`docs/day-15-integration-test-report.md` and `docs/prompt-journal.md`).
+- Application code untouched (0 code changes).
+- Preserved untracked file: `supportdesk_messy_express_demo.js`.
+- Zero commits, pushes, or merges performed.
