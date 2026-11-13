@@ -846,3 +846,88 @@ $ npm test -- --run
       Tests  50 passed (50)
    Duration  2.39s
 ```
+
+---
+
+## Entry 16 — Day 14 Stage 3: Reusable & Accessible UI Component Suite
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 3)  
+
+### 1. Task / Context
+Implement accessible, reusable UI atoms and ticket badges for SupportDesk ticket screens (Badge, Select, Textarea, Modal, StatusBadge, PriorityBadge) following the design conventions of the existing dashboard. Ensure full keyboard accessibility, ARIA associations, responsive styles, and author comprehensive Vitest component tests.
+
+### 2. Exact Prompts Used
+
+**Stage 3 Prompt:**
+> "Build reusable, accessible UI components required for the Ticket List, Ticket Detail, Create Ticket, and Comment screens.
+> Create:
+> - Badge.tsx (neutral, success, warning, danger, brand variants)
+> - Select.tsx (label, options, placeholder, disabled, error, accessible attributes)
+> - Textarea.tsx (label, placeholder, rows, disabled, error, optional character counter)
+> - Modal.tsx (accessible dialog, close button, escape key listener, backdrop click, focus management, body scroll lock)
+> - StatusBadge.tsx (OPEN, IN_PROGRESS, WAITING_ON_CUSTOMER, RESOLVED, CLOSED)
+> - PriorityBadge.tsx (P1, P2, P3, P4)
+> Design requirements: Follow existing SupportDesk dashboard design, consistent spacing, readable contrast, focus indicators.
+> Tests: Add tests covering badge variants, 5 statuses, 4 priorities, select label/error/disabled, textarea label/error/counter, modal open/close, escape-key, modal accessibility."
+
+### 3. Summary of Implementation & Components Created
+1. **`Badge.tsx` (`src/components/ui/Badge.tsx`):**
+   - Lightweight, accessible pill component supporting 5 visual variants: `neutral`, `success`, `warning`, `danger`, and `brand` with sizes `sm` and `md`.
+2. **`Select.tsx` (`src/components/ui/Select.tsx`):**
+   - Accessible form dropdown supporting options array or native `<option>` children.
+   - Chevron icon indicator, `aria-invalid`, `aria-describedby` linking to error or helper text, and disabled states matching `Input.tsx`.
+3. **`Textarea.tsx` (`src/components/ui/Textarea.tsx`):**
+   - Multi-line input with forwardRef, responsive resize, dynamic character counter (`showCount` + `maxLength`), and accessible error alerts.
+4. **`Modal.tsx` (`src/components/ui/Modal.tsx`):**
+   - Pure React accessible dialog (`role="dialog"`, `aria-modal="true"`, `aria-labelledby`, `aria-describedby`).
+   - Backdrop overlay with blur, ESC-key keyboard listener, backdrop click dismiss, body scroll lock/unlock on mount/unmount, and header close button. Zero external library bloat.
+5. **`StatusBadge.tsx` (`src/features/tickets/components/StatusBadge.tsx`):**
+   - Color-coded badges with dot indicators for all 5 verified backend statuses:
+     - `OPEN`: Brand blue
+     - `IN_PROGRESS`: Amber
+     - `WAITING_ON_CUSTOMER`: Neutral gray
+     - `RESOLVED`: Emerald green
+     - `CLOSED`: Neutral slate
+6. **`PriorityBadge.tsx` (`src/features/tickets/components/PriorityBadge.tsx`):**
+   - Distinct severity styling for all 4 priorities:
+     - `P1`: Red ("P1 — Critical")
+     - `P2`: Orange ("P2 — High")
+     - `P3`: Blue ("P3 — Medium")
+     - `P4`: Gray ("P4 — Low")
+
+### 4. Files Created and Modified
+#### Created:
+- `apps/web/src/components/ui/Badge.tsx`
+- `apps/web/src/components/ui/Select.tsx`
+- `apps/web/src/components/ui/Textarea.tsx`
+- `apps/web/src/components/ui/Modal.tsx`
+- `apps/web/src/features/tickets/components/StatusBadge.tsx`
+- `apps/web/src/features/tickets/components/PriorityBadge.tsx`
+- `apps/web/tests/components.ui.test.tsx`
+
+#### Modified:
+- `docs/prompt-journal.md` (appended Day 14 Stage 3 entry)
+
+### 5. Tests Executed & Actual Output
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm run build
+tsc -b && vite build -> 1653 modules transformed, dist/ generated in 1.39s
+
+$ npm test -- --run
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/components.ui.test.tsx (17 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  7 passed (7)
+      Tests  67 passed (67)
+   Duration  1.93s
+```
