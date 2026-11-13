@@ -766,3 +766,83 @@ $ npm test -- --run
       Tests  40 passed (40)
    Duration  2.01s
 ```
+
+---
+
+## Entry 15 — Day 14 Stage 2: TanStack Query Hooks for Tickets & Comments
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 2)  
+
+### 1. Task / Context
+Implement TanStack Query v5 custom hooks for ticket querying, detail fetching, ticket mutations, comment listing, and comment creation. Establish a centralized query key factory with filter/pagination encapsulation, cache invalidation strategies, and authentication session isolation.
+
+### 2. Exact Prompts Used
+
+**Stage 2 Prompt:**
+> "Implement the TanStack Query hooks for tickets and comments using the Stage 1 API functions.
+> Requirements:
+> 1. Query key architecture: Create a centralized query key factory. Ticket list keys must include all relevant filters and pagination parameters. Ticket detail keys must include ticket ID. Comment keys must include ticket ID.
+> 2. Implement hooks under apps/web/src/features/tickets/hooks/:
+>    - useTickets.ts: Fetch paginated tickets using listTickets.
+>    - useTicket.ts: Fetch ticket by ID with disabled state when ID is missing.
+>    - useTicketMutations.ts: useCreateTicket (invalidates lists) and useUpdateTicket (updates detail cache and invalidates lists).
+>    - useComments.ts: useComments query and useCreateComment mutation (invalidates comments).
+> 3. Tests: Add focused hook tests covering list success/error, key isolation, detail success/disabled, mutation invalidations, and cache isolation across logout."
+
+### 3. Query Key Architecture & Cache Invalidation
+- **Query Key Factory (`queryKeys.ts`):**
+  - `ticketKeys.all`: `["tickets"]`
+  - `ticketKeys.lists()`: `["tickets", "list"]`
+  - `ticketKeys.list(params)`: `["tickets", "list", params ?? {}]`
+  - `ticketKeys.details()`: `["tickets", "detail"]`
+  - `ticketKeys.detail(id)`: `["tickets", "detail", id]`
+  - `commentKeys.all`: `["comments"]`
+  - `commentKeys.lists()`: `["comments", "list"]`
+  - `commentKeys.list(ticketId)`: `["comments", "list", ticketId]`
+- **Cache Invalidation Strategy:**
+  - `useCreateTicket`: On success, calls `queryClient.invalidateQueries({ queryKey: ticketKeys.lists() })` ensuring newly created tickets appear in all ticket list views.
+  - `useUpdateTicket`: On success, calls `queryClient.setQueryData(ticketKeys.detail(id), updatedTicket)`, updates the single ticket detail in cache, and calls `queryClient.invalidateQueries` on `ticketKeys.detail(id)` and `ticketKeys.lists()`.
+  - `useCreateComment`: On success, calls `queryClient.invalidateQueries({ queryKey: commentKeys.list(ticketId) })`, automatically refetching the chronological comment thread.
+- **Authentication Session & Cache Isolation:**
+  - In `apps/web/src/lib/auth.tsx`, the `logout()` callback explicitly executes `queryClient.clear()`.
+  - This completely purges all in-memory query caches when a user signs out, preventing cross-account leakage (e.g. customer data lingering in cache when switching to an agent account). Verified through automated testing.
+
+### 4. Zod Resolver Compatibility Finding
+- Inspected installed `@hookform/resolvers` (`^4.1.3`) with `zod` (`4.6.7`).
+- Verified execution: `zodResolver(schema)` correctly parses and validates schemas under Zod 4, producing expected `{ errors }` on invalid payloads and `{ values }` on valid data without warnings or runtime breaks.
+
+### 5. Files Created and Modified
+#### Created:
+- `apps/web/src/features/tickets/hooks/queryKeys.ts`
+- `apps/web/src/features/tickets/hooks/useTickets.ts`
+- `apps/web/src/features/tickets/hooks/useTicket.ts`
+- `apps/web/src/features/tickets/hooks/useTicketMutations.ts`
+- `apps/web/src/features/tickets/hooks/useComments.ts`
+- `apps/web/src/features/tickets/hooks/index.ts`
+- `apps/web/tests/ticket.hooks.test.tsx`
+
+#### Modified:
+- `docs/prompt-journal.md` (appended Day 14 Stage 2 entry)
+
+### 6. Tests Executed & Actual Output
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm run build
+tsc -b && vite build -> 1653 modules transformed, dist/ generated in 1.15s
+
+$ npm test -- --run
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/ticket.hooks.test.tsx (10 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  6 passed (6)
+      Tests  50 passed (50)
+   Duration  2.39s
+```
