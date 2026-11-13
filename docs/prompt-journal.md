@@ -674,3 +674,95 @@ Protected GET /api/v1/tickets with Bearer token: 200 OK -> data count: 0
 Protected GET /api/v1/tickets without token: 401 UNAUTHORIZED -> "Authorization header is missing"
 Invalid credentials login: 401 UNAUTHORIZED -> "Invalid email or password"
 ```
+
+---
+
+## Entry 14 — Day 14 Stage 1: Shared Zod Schema and Centralized Ticket API Foundation
+
+**Date:** 13 November 2026  
+**Week:** 3  
+**Day:** 14 (Stage 1)  
+
+### 1. Task / Context
+Implement the shared Zod schema integration between frontend and backend, comprehensive TypeScript contracts for tickets and comments, and centralized ticket API service functions in `apps/web/src/features/tickets/`. Enforce zero schema duplication, verify query parameter serialization, and author dedicated automated Vitest tests without modifying backend source code.
+
+### 2. Exact Prompts Used
+
+**Stage 1 Prompt:**
+> "Implement only the shared Zod schema integration, ticket/comment types, and centralized ticket API functions.
+> Git requirements:
+> - Repository: SupportDesk
+> - Create branch: feat/web-tickets-screen
+> - Base branch: feat/web-login-foundation
+> - Preserve all existing uncommitted and untracked files.
+> - Do not modify or stage supportdesk_messy_express_demo.js.
+> - Do not merge any PR.
+> Implementation tasks:
+> 1. Shared Zod integration: Use the exact backend createTicketBodySchema. Do not duplicate or rewrite the schema. Configure Vite and TypeScript path resolution safely for the shared backend schema.
+> 2. Ticket and comment types: Create apps/web/src/features/tickets/types.ts defining Ticket, TicketStatus, TicketPriority, Comment, ListTicketsQuery, Pagination metadata, and input types.
+> 3. Ticket API functions: Create apps/web/src/features/tickets/api/tickets.api.ts implementing listTickets, getTicketById, createTicket, updateTicket, listComments, createComment using api-client.ts.
+> 4. Tests: Add focused Vitest tests for shared schema import, query parameter serialization, API responses, error propagation, and endpoints."
+
+### 3. Summary of Implementation & Architecture
+1. **Shared Zod Schema Integration:**
+   - Instead of duplicating `createTicketBodySchema`, `apps/web` directly imports the exact schema from `apps/api/src/schemas/ticket.schema.ts`.
+   - Configured Vite path alias `@supportdesk/schemas` in `apps/web/vite.config.ts`.
+   - Configured TypeScript paths mapping `@supportdesk/schemas/*` and updated `"include"` in `apps/web/tsconfig.json`.
+   - Installed matching `zod` (`4.6.7`) and `@hookform/resolvers` in `apps/web/package.json`.
+2. **Contracts & Domain Types (`apps/web/src/features/tickets/types.ts`):**
+   - Re-exported inferred schema types `CreateTicketInput`, `UpdateTicketInput`, `ListTicketsQuery` directly from backend schema.
+   - Defined `ListTicketsParams` as `z.input<typeof listTicketsQuerySchema>` to allow flexible client-side filter queries before server-side defaults apply.
+   - Defined complete domain models: `Ticket`, `TicketStatus`, `TicketPriority`, `Comment`, `UserSummary`, `PaginationMeta`, `PaginatedTicketsResponse`, `CreateCommentInput`.
+3. **Centralized Ticket API Service (`apps/web/src/features/tickets/api/tickets.api.ts`):**
+   - Extended `apps/web/src/lib/api-client.ts` with `apiRequestWithMeta<T>` to preserve backend response metadata (`pagination: { page, limit, total, totalPages }`).
+   - Implemented `buildQueryString` supporting `page`, `limit`, `status`, `priority`, `category`, `search`, `sortBy`, `sortOrder`, and `assigneeId`, stripping empty/whitespace values.
+   - Implemented `listTickets`, `getTicketById`, `createTicket`, `updateTicket`, `listComments`, and `createComment`.
+   - Guaranteed security and contract fidelity: authentication tokens are attached automatically by the centralized client via `sessionStorage`, and internal comments are controlled strictly by backend RBAC rather than client filtering.
+4. **Focused Vitest Test Suite (`apps/web/tests/tickets.api.test.ts`):**
+   - 17 new automated tests covering:
+     - Shared schema import and validation (valid payload, title min 3, description min 5, update rejection of empty payloads).
+     - Query string serialization (empty, pagination, compound filters, whitespace trimming, sorting).
+     - Full mock API lifecycle for all 6 operations (`GET`, `POST`, `PATCH`).
+     - Error handling and propagation (`ApiError` with status codes 404, 403, 400).
+
+### 4. Files Created and Modified
+#### Created:
+- `apps/web/src/features/tickets/types.ts`
+- `apps/web/src/features/tickets/api/tickets.api.ts`
+- `apps/web/tests/tickets.api.test.ts`
+
+#### Modified:
+- `apps/web/package.json` (added `zod` 4.6.7 and `@hookform/resolvers`)
+- `apps/web/package-lock.json`
+- `apps/web/vite.config.ts` (added `@supportdesk/schemas` path alias)
+- `apps/web/tsconfig.json` (added `@supportdesk/schemas/*` path mapping and include)
+- `apps/web/src/lib/api-client.ts` (added `apiRequestWithMeta<T>`)
+- `docs/prompt-journal.md` (appended Day 14 Stage 1 entry)
+
+### 5. Problems Encountered and Solutions
+1. **Zod Output vs. Input Query Types (`TS2345`):**
+   - *Problem:* `listTicketsQuerySchema` defines `.default(...)` for `page`, `limit`, `sortBy`, and `sortOrder`. In Zod, `z.infer` evaluates to the parsed output type (where defaulted fields are required). Passing partial filter objects (e.g. `{ status: "OPEN" }`) caused a TypeScript type error.
+   - *Solution:* Defined `ListTicketsParams = z.input<typeof listTicketsQuerySchema>`, accurately typing client-side query parameters before backend parsing applies defaults.
+2. **Accessing Pagination Metadata from Envelope:**
+   - *Problem:* `apiRequest<T>` unwrapped only `payload.data`, dropping `payload.meta.pagination`.
+   - *Solution:* Added `apiRequestWithMeta<T>` in `api-client.ts`, refactoring the core request logic into `executeRequest` without breaking backward compatibility for any existing Day 13 endpoints or tests.
+
+### 6. Tests Executed & Actual Output
+```
+$ npm run typecheck
+tsc --noEmit -> 0 errors
+
+$ npm run build
+tsc -b && vite build -> 1653 modules transformed, dist/ generated in 1.22s
+
+$ npm test -- --run
+ ✓ tests/api-client.test.ts (9 tests)
+ ✓ tests/auth.test.tsx (4 tests)
+ ✓ tests/tickets.api.test.ts (17 tests)
+ ✓ tests/ProtectedRoute.test.tsx (2 tests)
+ ✓ tests/LoginPage.test.tsx (8 tests)
+
+ Test Files  5 passed (5)
+      Tests  40 passed (40)
+   Duration  2.01s
+```

@@ -139,13 +139,10 @@ export interface RequestOptions extends Omit<RequestInit, "body"> {
   skipAuth?: boolean;
 }
 
-/**
- * Core centralized request method using native Fetch API.
- */
-export async function apiRequest<T>(
+async function executeRequest<T>(
   endpoint: string,
-  options: RequestOptions = {}
-): Promise<T> {
+  options: RequestOptions
+): Promise<ApiResponse<T>> {
   const baseUrl = getApiBaseUrl();
   const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const url = `${baseUrl}${normalizedEndpoint}`;
@@ -211,12 +208,44 @@ export async function apiRequest<T>(
     throw new ApiError(status, errorCode, errorMessage, details);
   }
 
+  return (
+    payload || {
+      data: null,
+      error: null,
+      meta: {},
+    }
+  );
+}
+
+/**
+ * Core centralized request method using native Fetch API, returning unboxed data.
+ */
+export async function apiRequest<T>(
+  endpoint: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  const payload = await executeRequest<T>(endpoint, options);
+
   // Success path: return unboxed data property
   if (payload && payload.data !== null && payload.data !== undefined) {
     return payload.data;
   }
 
   return null as unknown as T;
+}
+
+/**
+ * Request method returning both data and metadata envelope (e.g. for paginated results).
+ */
+export async function apiRequestWithMeta<T>(
+  endpoint: string,
+  options: RequestOptions = {}
+): Promise<{ data: T; meta: Record<string, unknown> }> {
+  const payload = await executeRequest<T>(endpoint, options);
+  return {
+    data: (payload?.data !== null && payload?.data !== undefined ? payload.data : null) as T,
+    meta: payload?.meta || {},
+  };
 }
 
 /**
