@@ -80,8 +80,7 @@ export class AiController {
         if (!res.headersSent) {
           next(streamErr);
         } else {
-          const message =
-            (streamErr as Error).message || "Generation stream interrupted";
+          const message = "AI unavailable — reply manually.";
           res.write(
             `event: error\ndata: ${JSON.stringify({
               code: "AI_STREAM_ERROR",

@@ -493,9 +493,9 @@ Test runner: Node.js native test runner (`tsx --test tests/**/*.test.ts`) using 
 
 ## Entry 13 — Frontend Foundations: React, Vite, Tailwind CSS & Authentication
 
-**Date:** 12 November 2026  
-**Week:** 3  
-**Day:** 13 (Week 3 Day 1)  
+**Date:** 12 November 2026
+**Week:** 3
+**Day:** 13 (Week 3 Day 1)
 
 ### 1. Task / Context
 Implement the frontend foundations for SupportDesk in `apps/web` using React 18, Vite, TypeScript, Tailwind CSS, TanStack Query, React Hook Form, and React Router DOM. Deliver a production-grade, accessible login experience, authentication state management, centralized API client, protected application shell, and ticket feature scaffolding.
@@ -679,9 +679,9 @@ Invalid credentials login: 401 UNAUTHORIZED -> "Invalid email or password"
 
 ## Entry 14 — Day 14 Stage 1: Shared Zod Schema and Centralized Ticket API Foundation
 
-**Date:** 13 November 2026  
-**Week:** 3  
-**Day:** 14 (Stage 1)  
+**Date:** 13 November 2026
+**Week:** 3
+**Day:** 14 (Stage 1)
 
 ### 1. Task / Context
 Implement the shared Zod schema integration between frontend and backend, comprehensive TypeScript contracts for tickets and comments, and centralized ticket API service functions in `apps/web/src/features/tickets/`. Enforce zero schema duplication, verify query parameter serialization, and author dedicated automated Vitest tests without modifying backend source code.
@@ -771,9 +771,9 @@ $ npm test -- --run
 
 ## Entry 15 — Day 14 Stage 2: TanStack Query Hooks for Tickets & Comments
 
-**Date:** 13 November 2026  
-**Week:** 3  
-**Day:** 14 (Stage 2)  
+**Date:** 13 November 2026
+**Week:** 3
+**Day:** 14 (Stage 2)
 
 ### 1. Task / Context
 Implement TanStack Query v5 custom hooks for ticket querying, detail fetching, ticket mutations, comment listing, and comment creation. Establish a centralized query key factory with filter/pagination encapsulation, cache invalidation strategies, and authentication session isolation.
@@ -851,9 +851,9 @@ $ npm test -- --run
 
 ## Entry 16 — Day 14 Stage 3: Reusable & Accessible UI Component Suite
 
-**Date:** 13 November 2026  
-**Week:** 3  
-**Day:** 14 (Stage 3)  
+**Date:** 13 November 2026
+**Week:** 3
+**Day:** 14 (Stage 3)
 
 ### 1. Task / Context
 Implement accessible, reusable UI atoms and ticket badges for SupportDesk ticket screens (Badge, Select, Textarea, Modal, StatusBadge, PriorityBadge) following the design conventions of the existing dashboard. Ensure full keyboard accessibility, ARIA associations, responsive styles, and author comprehensive Vitest component tests.
@@ -937,9 +937,9 @@ $ npm test -- --run
 
 ## Entry 17 — Day 14 Stage 3: Modal Accessibility Verification & Focus Trapping
 
-**Date:** 13 November 2026  
-**Week:** 3  
-**Day:** 14 (Stage 3 Verification)  
+**Date:** 13 November 2026
+**Week:** 3
+**Day:** 14 (Stage 3 Verification)
 
 ### 1. Task / Context
 Perform an accessibility audit and verification on `apps/web/src/components/ui/Modal.tsx` prior to Stage 4 screen implementation. Address verified accessibility gaps regarding focus management, focus trapping, focus restoration upon closing, background interaction containment, and dismissal controls without introducing third-party modal dependencies or redesigning the component.
@@ -1016,9 +1016,9 @@ $ npm test -- --run
 
 ## Entry 18 — Day 14 Stage 4A: Ticket List Screen
 
-**Date:** 13 November 2026  
-**Week:** 3  
-**Day:** 14 (Stage 4A)  
+**Date:** 13 November 2026
+**Week:** 3
+**Day:** 14 (Stage 4A)
 
 ### 1. Task / Context
 Implement the production-grade Ticket List Screen using the existing SupportDesk frontend architecture, TanStack Query hooks, and reusable UI components. Deliver a responsive table and card view, server-side pagination with backend metadata, live search, status and priority filtering, filter clearing, empty/no-results/error/loading states, and detail route navigation without inventing unsupported backend endpoints or doing insecure client-side filtering.
@@ -1137,9 +1137,9 @@ tsc -b && vite build -> 1661 modules transformed, dist/ generated in 1.09s
 
 ## Entry 19 — Day 14 Stage 4B: Ticket Detail Screen & Conversation Thread
 
-**Date:** 13 November 2026  
-**Week:** 3  
-**Day:** 14 (Stage 4B)  
+**Date:** 13 November 2026
+**Week:** 3
+**Day:** 14 (Stage 4B)
 
 ### 1. Task / Context
 Implement the production-grade Ticket Detail Screen under `apps/web/` on the dedicated feature branch `feat/web-ticket-detail-screen`. Incorporate full ticket metadata presentation (title, description, status, priority, category, requester, assignee, timestamps, SLA), conversation history (comments thread with customer vs. staff role badges and internal note indicators), and interactive comment submission with validation, loading states, and automatic TanStack Query cache invalidation.
@@ -1243,9 +1243,9 @@ tsc -b && vite build -> 1666 modules transformed, dist/ generated in 1.10s
 
 ## Entry 20 — Day 14 Stage 4C: Create Ticket Screen & Submission Flow
 
-**Date:** 13 November 2026  
-**Week:** 3  
-**Day:** 14 (Stage 4C)  
+**Date:** 13 November 2026
+**Week:** 3
+**Day:** 14 (Stage 4C)
 
 ### 1. Task / Context
 Implement a production-grade Create Ticket experience integrated with the existing SupportDesk backend and frontend architecture on branch `feat/web-create-ticket`. Utilize the shared Zod schema `createTicketBodySchema` with React Hook Form and `@hookform/resolvers/zod`, provide comprehensive validation (required fields, whitespace rejections, character boundaries), handle loading and duplicate submission prevention, integrate TanStack Query cache invalidation, and ensure seamless navigation upon ticket registration.
@@ -1338,9 +1338,9 @@ tsc -b && vite build -> 1767 modules transformed, dist/ generated in 1.28s
 
 ## Entry 21 — Day 15 Stage 5: Full-Stack Integration Testing
 
-**Date:** 13 November 2026  
-**Week:** 3  
-**Day:** 15 (Stage 5)  
+**Date:** 13 November 2026
+**Week:** 3
+**Day:** 15 (Stage 5)
 
 ### 1. Task / Context
 Perform a complete full-stack integration and acceptance verification of the SupportDesk frontend and backend on branch `feat/web-create-ticket`. Verify the actual application using the real API and live PostgreSQL database. Adhere to strict safety rules: zero code modifications unless defects are found and approved, zero database schema/migration modifications, no exposure of secrets/passwords/JWTs, preservation of untracked `supportdesk_messy_express_demo.js`, and no commit/push/merge.
@@ -1393,9 +1393,9 @@ All 12 acceptance scenarios were executed against the live API and PostgreSQL da
 
 ## Entry 22 — Day 15 Stage 5B: Browser Acceptance Testing
 
-**Date:** 13 November 2026  
-**Week:** 3  
-**Day:** 15 (Stage 5B)  
+**Date:** 13 November 2026
+**Week:** 3
+**Day:** 15 (Stage 5B)
 
 ### 1. Task / Context
 Execute end-to-end browser acceptance testing of the live SupportDesk React UI against the live Express backend API and PostgreSQL database on branch `feat/web-create-ticket`. Verify real browser interactions for authentication, invalid credentials, protected route guards, ticket lists, ticket creation, ticket details, public comments, staff internal notes, and logout. Capture screenshots without exposing secrets or credentials.
@@ -1424,3 +1424,80 @@ Execute end-to-end browser acceptance testing of the live SupportDesk React UI a
 - Application code untouched (0 code changes).
 - Preserved untracked file: `supportdesk_messy_express_demo.js`.
 - Zero commits, pushes, or merges performed.
+
+
+---
+
+## Entry 23 — Day 17: Guardrails for AI Features
+
+**Date:** 25 November 2026
+**Week:** 4
+**Day:** 17
+
+### 1. Task / Context
+Harden the AI features implemented on Day 16 (Feature A: Suggest Reply Stream and Feature B: Auto-Categorisation & Priority) against prompt injection, delimiter breakout attacks, sensitive PII leakage, and output data tampering. Ensure that untrusted customer-provided ticket data cannot manipulate model behavior or execute unauthorized actions. Implement per-user rate limits, request timeouts, and safe manual failure fallbacks. Validate against 10 adversarial prompt injection attack samples and benchmark categorization accuracy across 20 labelled support tickets (target &ge; 80%).
+
+### 2. Guardrails Architecture Implemented
+1. **Input Length Limits & Truncation:**
+   - Ticket Title: strictly capped at 255 characters (`MAX_TITLE_LENGTH`).
+   - Ticket Description: strictly capped at 4,000 characters (`MAX_DESCRIPTION_LENGTH`).
+   - Customer Comments Context: limited to the latest 5 public comments, each capped at 1,000 characters (`MAX_COMMENT_LENGTH`).
+   - Agent Instructions: capped at 500 characters (`MAX_AGENT_INSTRUCTIONS_LENGTH`).
+2. **Untrusted Context Delimitation & Breakout Protection:**
+   - Wrapped untrusted customer inputs within explicit XML tags: `<untrusted_ticket_data>` and `<untrusted_customer_comments>`.
+   - Added `sanitizeDelimiters()` to escape injected `</untrusted_...>` closing tags into safe HTML entities (`&lt;/untrusted_...&gt;`), eliminating delimiter breakout vulnerabilities.
+   - Updated system prompts with explicit developer directives specifying that content within untrusted tags is passive data that must never override system instructions, assume new personas (e.g. DAN), or execute commands.
+3. **PII Masking (`piiMasker.ts`):**
+   - High-precision deterministic regex masking for sensitive personal data before prompt interpolation:
+     - Emails &rarr; `[EMAIL_REDACTED]`
+     - US & International Phone Numbers &rarr; `[PHONE_REDACTED]`
+     - Credit Card Numbers &rarr; `[CARD_REDACTED]`
+     - Social Security Numbers (SSN) &rarr; `[SSN_REDACTED]`
+     - Bearer Tokens, API Keys, and Passwords &rarr; `[TOKEN_REDACTED]`
+     - IPv4 & IPv6 Addresses &rarr; `[IP_REDACTED]`
+4. **Content Moderation (`contentModeration.ts`):**
+   - Pre-invocation deterministic safety classifier detecting explicit violent threats, self-harm language, and malicious executable script tags (`<script>...`, `javascript:alert`).
+5. **Per-User Rate Limiting (`rateLimiter.ts`):**
+   - Mounted `aiRateLimiter` middleware on all AI routes restricting users to 10 requests per minute keyed by authenticated user ID (`req.user.id`).
+   - Intercepts excessive traffic with HTTP 429 `RATE_LIMIT_EXCEEDED` and `retryAfterSeconds` metadata.
+6. **Request Timeout & Safe Manual Fallback:**
+   - Enforced 10-second timeout (`AI_REQUEST_TIMEOUT_MS = 10000`) on model calls via `withTimeout`.
+   - On provider timeouts, network failures, or unconfigured keys, returns safe fallback: **“AI unavailable — reply manually.”**
+   - Interrupted SSE streams yield fallback error message without crashing the server or breaking normal ticket workflows.
+7. **Strict Schema & Business Rule Enforcement:**
+   - Auto-categorisation responses are strictly validated against `aiCategorizeResponseSchema` via Zod.
+   - Malformed JSON, non-enum categories, or non-standard priorities (e.g. `P0`) are immediately rejected.
+
+### 3. Verification & Evaluation Results
+- **Automated Tests:**
+  - `apps/api/tests/ai.guardrails.spec.ts`: **32 / 32 Passed**
+  - `apps/api/tests/ai.feature.spec.ts`: **26 / 26 Passed**
+  - `apps/api/tests/gemini.client.spec.ts`: **11 / 11 Passed**
+  - Total AI Test Suite: **69 / 69 Passed** in 0.595s.
+  - Frontend vitest: **183 / 183 Passed** across 12 test files.
+- **10 Adversarial Injection Attacks:**
+  - Tested 10 attack samples (`INJ-001` through `INJ-010`) covering instruction override, prompt leak, delimiter breakout, XSS script injection, unauthorized action execution, secret harvesting, emotional panic extortion, DAN persona jailbreak, base64 obfuscation, and schema poisoning.
+  - All 10 attacks successfully mitigated. Full details recorded in `docs/day-17-injection-test-report.md`.
+- **20-Ticket Categorization Evaluation:**
+  - Executed automated evaluation script (`npm run ai:eval`).
+  - Overall Categorization Accuracy: **100% (20/20)** (exceeded &ge; 80% target).
+  - Priority Tier Accuracy: **100% (20/20)**.
+  - Full breakdown recorded in `docs/day-17-evaluation-report.md`.
+- **Typecheck & Production Build:**
+  - Backend: `npm run typecheck` passed (0 errors); `npm run build` passed.
+  - Frontend: `npm run typecheck` passed (0 errors); `npm run build` passed.
+
+### 4. Artifacts Created & Updated
+- `apps/api/src/ai/guardrails/piiMasker.ts`
+- `apps/api/src/ai/guardrails/contentModeration.ts`
+- `apps/api/src/ai/guardrails/rateLimiter.ts`
+- `apps/api/src/ai/datasets/maliciousTickets.ts`
+- `apps/api/src/ai/datasets/evaluationTickets.ts`
+- `apps/api/src/ai/evaluation/evaluateCategorization.ts`
+- `apps/api/tests/ai.guardrails.spec.ts`
+- `docs/day-17-injection-test-report.md`
+- `docs/day-17-evaluation-report.md`
+- `docs/prompt-journal.md` (Entry 23)
+
+### 5. Term of the Day
+**RCA (Root Cause Analysis):** A systematic problem-solving methodology aimed at identifying the fundamental, underlying cause of a failure, vulnerability, or operational fault—rather than merely addressing superficial symptoms. In the context of LLM security, an RCA of prompt injection demonstrates that the root vulnerability is the architectural conflation of control instructions and untrusted data within a single input channel. Mitigating this root cause requires strict contextual separation (boundary delimitation, entity escaping, and anti-injection system constraints) rather than brittle, reactive keyword blacklists.
