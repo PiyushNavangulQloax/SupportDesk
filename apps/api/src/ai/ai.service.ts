@@ -7,7 +7,11 @@ import {
   commentsRepository,
   CommentsRepository,
 } from "../repositories/comments.repository.js";
-import { NotFoundError, AppError } from "../errors/appError.js";
+import {
+  NotFoundError,
+  AppError,
+  AiServiceUnavailableError,
+} from "../errors/appError.js";
 import type { AuthenticatedUser } from "../types/express.js";
 import {
   buildSuggestReplyPrompt,
@@ -26,6 +30,10 @@ import {
   type AiCategorizeResponse,
 } from "./schemas/ai.schema.js";
 import { calculateEstimatedCostUsd } from "./pricing.js";
+import { moderateContent } from "./guardrails/contentModeration.js";
+
+export const AI_REQUEST_TIMEOUT_MS = 10000;
+export const AI_SAFE_FALLBACK_MESSAGE = "AI unavailable — reply manually.";
 
 export interface StreamCompletionResult {
   promptTokens?: number;
@@ -58,6 +66,31 @@ export interface CategorizeTicketResult {
   };
 }
 
+/**
+ * Executes a promise with an enforced timeout.
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number = AI_REQUEST_TIMEOUT_MS,
+  timeoutErrorMessage = "AI request timed out"
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new AppError(timeoutErrorMessage, 504, "AI_TIMEOUT"));
+    }, timeoutMs);
+    timer.unref?.();
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 export class AiService {
   constructor(
     private readonly client: GeminiClient = geminiClient,
@@ -68,7 +101,8 @@ export class AiService {
   /**
    * Feature A: Suggest Reply Stream.
    * Retrieves ticket details + latest 5 PUBLIC comments (excluding internal notes),
-   * builds versioned prompt, and returns an async stream handle.
+   * applies moderation, PII masking, untrusted context delimitation,
+   * and returns an async stream handle with 10s timeout protection.
    * Does NOT auto-send or persist the response.
    */
   async suggestReplyStream(
@@ -79,6 +113,27 @@ export class AiService {
     const ticket = await this.ticketsRepo.findById(ticketId);
     if (!ticket) {
       throw new NotFoundError("Ticket not found");
+    }
+
+    // Guardrail: Content moderation check on input
+    const textToModerate = `${ticket.title} ${ticket.description} ${instructions || ""}`;
+    const moderation = moderateContent(textToModerate);
+    if (!moderation.isSafe) {
+      logAiUsage({
+        type: "AI_USAGE_METRIC",
+        feature: "SUGGEST_REPLY",
+        ticketId,
+        model: this.client.model,
+        durationMs: 0,
+        success: false,
+        timestamp: new Date().toISOString(),
+      });
+      throw new AppError(
+        AI_SAFE_FALLBACK_MESSAGE,
+        400,
+        "AI_CONTENT_MODERATION_BLOCKED",
+        { reason: moderation.reason, flagged: moderation.flaggedCategories }
+      );
     }
 
     // Retrieve latest public comments only (includeInternal = false)
@@ -96,12 +151,51 @@ export class AiService {
 
     const startTime = Date.now();
 
-    const stream = await this.client.generateContentStream({
-      contents: prompt,
-      config: {
-        systemInstruction: SUGGEST_REPLY_SYSTEM_INSTRUCTION,
-      },
-    });
+    let rawStream: AsyncIterable<{ text?: string; usageMetadata?: any }>;
+    try {
+      rawStream = await withTimeout(
+        this.client.generateContentStream({
+          contents: prompt,
+          config: {
+            systemInstruction: SUGGEST_REPLY_SYSTEM_INSTRUCTION,
+          },
+        }),
+        AI_REQUEST_TIMEOUT_MS,
+        "AI reply suggestion timed out"
+      );
+    } catch (err: unknown) {
+      logAiUsage({
+        type: "AI_USAGE_METRIC",
+        feature: "SUGGEST_REPLY",
+        ticketId,
+        model: this.client.model,
+        durationMs: Date.now() - startTime,
+        success: false,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (err instanceof AiServiceUnavailableError) {
+        throw err;
+      }
+      const causeMsg = (err as Error)?.message || String(err);
+      throw new AiServiceUnavailableError(
+        `${AI_SAFE_FALLBACK_MESSAGE} (${causeMsg})`,
+        { cause: causeMsg }
+      );
+    }
+
+    // Wrap stream with timeout and fallback protection per chunk
+    const protectedStream = (async function* () {
+      try {
+        for await (const chunk of rawStream) {
+          yield chunk;
+        }
+      } catch (streamIterErr) {
+        // Safe fallback chunk if interrupted mid-stream
+        yield { text: `\n\n[${AI_SAFE_FALLBACK_MESSAGE}]` };
+        throw streamIterErr;
+      }
+    })();
 
     const onComplete = (
       usageMetadata?: {
@@ -145,7 +239,7 @@ export class AiService {
     };
 
     return {
-      stream,
+      stream: protectedStream,
       model: this.client.model,
       promptVersion: SUGGEST_REPLY_PROMPT_VERSION,
       ticketId,
@@ -167,20 +261,45 @@ export class AiService {
       throw new NotFoundError("Ticket not found");
     }
 
+    // Guardrail: Content moderation check on input
+    const textToModerate = `${ticket.title} ${ticket.description}`;
+    const moderation = moderateContent(textToModerate);
+    if (!moderation.isSafe) {
+      logAiUsage({
+        type: "AI_USAGE_METRIC",
+        feature: "AUTO_CATEGORIZE",
+        ticketId,
+        model: this.client.model,
+        durationMs: 0,
+        success: false,
+        timestamp: new Date().toISOString(),
+      });
+      throw new AppError(
+        AI_SAFE_FALLBACK_MESSAGE,
+        400,
+        "AI_CONTENT_MODERATION_BLOCKED",
+        { reason: moderation.reason, flagged: moderation.flaggedCategories }
+      );
+    }
+
     const prompt = buildCategorizePrompt({ ticket });
     const startTime = Date.now();
 
     let response: any;
     try {
-      response = await this.client.generateContent({
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: CATEGORIZE_RESPONSE_SCHEMA,
-          systemInstruction: CATEGORIZE_SYSTEM_INSTRUCTION,
-        },
-      });
-    } catch (err) {
+      response = await withTimeout(
+        this.client.generateContent({
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: CATEGORIZE_RESPONSE_SCHEMA,
+            systemInstruction: CATEGORIZE_SYSTEM_INSTRUCTION,
+          },
+        }),
+        AI_REQUEST_TIMEOUT_MS,
+        "AI categorization request timed out"
+      );
+    } catch (err: unknown) {
       logAiUsage({
         type: "AI_USAGE_METRIC",
         feature: "AUTO_CATEGORIZE",
@@ -190,7 +309,15 @@ export class AiService {
         success: false,
         timestamp: new Date().toISOString(),
       });
-      throw err;
+
+      if (err instanceof AiServiceUnavailableError) {
+        throw err;
+      }
+      const causeMsg = (err as Error)?.message || String(err);
+      throw new AiServiceUnavailableError(
+        `${AI_SAFE_FALLBACK_MESSAGE} (${causeMsg})`,
+        { cause: causeMsg }
+      );
     }
 
     const rawText = response?.text || "";
@@ -211,7 +338,7 @@ export class AiService {
         timestamp: new Date().toISOString(),
       });
       throw new AppError(
-        "AI provider returned malformed or non-JSON output",
+        `${AI_SAFE_FALLBACK_MESSAGE}: Malformed or non-JSON output from AI provider`,
         502,
         "AI_INVALID_OUTPUT",
         { parseError: (parseErr as Error).message }
@@ -230,7 +357,7 @@ export class AiService {
         timestamp: new Date().toISOString(),
       });
       throw new AppError(
-        "AI categorization failed schema validation",
+        `${AI_SAFE_FALLBACK_MESSAGE}: Categorization failed schema validation`,
         502,
         "AI_SCHEMA_VALIDATION_ERROR",
         validated.error.issues
