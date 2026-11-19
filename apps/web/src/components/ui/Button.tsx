@@ -6,6 +6,8 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   variant?: "primary" | "secondary" | "outline" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
   isLoading?: boolean;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -16,6 +18,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size = "md",
       isLoading = false,
       disabled,
+      leftIcon,
+      rightIcon,
       children,
       ...props
     },
@@ -49,8 +53,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={isLoading}
         {...props}
       >
-        {isLoading && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+        ) : (
+          leftIcon
+        )}
         {children}
+        {rightIcon}
       </button>
     );
   }

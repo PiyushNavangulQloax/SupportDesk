@@ -3,3 +3,4 @@ export * from "./useTickets";
 export * from "./useTicket";
 export * from "./useTicketMutations";
 export * from "./useComments";
+export * from "./useAi";

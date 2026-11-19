@@ -28,6 +28,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || generatedId;
     const errorId = error ? `${inputId}-error` : undefined;
     const helperId = helperText ? `${inputId}-helper` : undefined;
+    const ariaDescribedBy =
+      [errorId, helperId].filter(Boolean).join(" ") || undefined;
 
     return (
       <div className="w-full space-y-1.5">
@@ -60,7 +62,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               className
             )}
             aria-invalid={Boolean(error)}
-            aria-describedby={errorId || helperId}
+            aria-describedby={ariaDescribedBy}
             {...props}
           />
           {rightIcon && (

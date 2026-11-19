@@ -10,6 +10,11 @@ export const envSchema = z
     JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters long"),
     JWT_EXPIRES_IN: z.string().min(1, "JWT_EXPIRES_IN cannot be empty").default("1d"),
     CORS_ORIGIN: z.string().min(1, "CORS_ORIGIN cannot be empty").default("http://localhost:5173"),
+
+    // Google Gemini AI Configuration (Backend Only)
+    GEMINI_API_KEY: z.string().trim().optional(),
+    AI_MODEL: z.string().trim().min(1).default("gemini-3.5-flash-lite"),
+    AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(1000),
   })
   .refine(
     (data) => {

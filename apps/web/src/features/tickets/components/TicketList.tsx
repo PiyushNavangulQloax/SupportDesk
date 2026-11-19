@@ -8,7 +8,6 @@ import {
   Loader2,
   Ticket as TicketIcon,
   RotateCcw,
-  User as UserIcon,
 } from "lucide-react";
 import { useTickets } from "../hooks/useTickets";
 import { StatusBadge } from "./StatusBadge";
@@ -19,6 +18,17 @@ import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select";
 import { Card } from "../../../components/ui/Card";
 import { Alert } from "../../../components/ui/Alert";
+import { Avatar } from "../../../components/ui/Avatar";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { LoadingState } from "../../../components/ui/LoadingState";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "../../../components/ui/Table";
 import type {
   Ticket,
   TicketStatus,
@@ -123,6 +133,13 @@ export const TicketList: React.FC<TicketListProps> = ({ pageSize = 10 }) => {
 
   return (
     <div className="space-y-4" data-testid="ticket-list-container">
+      {/* 0. Top-Level Heading */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900" data-testid="ticket-list-heading">
+          Tickets
+        </h1>
+      </div>
+
       {/* 1. Filter & Search Controls */}
       <Card padding="sm" className="bg-white">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
@@ -259,195 +276,171 @@ export const TicketList: React.FC<TicketListProps> = ({ pageSize = 10 }) => {
 
       {/* 3. Loading State */}
       {isLoading && (
-        <Card className="py-16 text-center" data-testid="ticket-list-loading">
-          <div
-            className="flex flex-col items-center justify-center gap-3 text-gray-500"
-            role="status"
-            aria-live="polite"
-          >
-            <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
-            <p className="text-sm font-medium">Loading tickets...</p>
-          </div>
-        </Card>
+        <LoadingState
+          message="Loading tickets..."
+          size="md"
+          asCard
+          data-testid="ticket-list-loading"
+        />
       )}
 
       {/* 4. Empty State (No tickets in system / for customer) */}
       {!isLoading && !isError && tickets.length === 0 && !hasActiveFilters && (
-        <Card
-          className="text-center py-16 px-4 border-dashed border-2"
+        <EmptyState
+          icon={<TicketIcon className="w-6 h-6" />}
+          title="No tickets found"
+          description="There are currently no support tickets to display."
+          isDashed
+          className="py-16"
           data-testid="ticket-list-empty"
-        >
-          <div className="max-w-md mx-auto space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-gray-100 text-gray-400 mx-auto flex items-center justify-center">
-              <TicketIcon className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-semibold text-gray-900">
-              No tickets found
-            </h3>
-            <p className="text-sm text-gray-500">
-              There are currently no support tickets to display.
-            </p>
-          </div>
-        </Card>
+        />
       )}
 
       {/* 5. No Results State (Filters returned 0 tickets) */}
       {!isLoading && !isError && tickets.length === 0 && hasActiveFilters && (
-        <Card
-          className="text-center py-16 px-4 border-dashed border-2"
+        <EmptyState
+          icon={<Search className="w-6 h-6" />}
+          title="No matching tickets"
+          description="No tickets match your search query or selected filter criteria."
+          isDashed
+          className="py-16"
           data-testid="ticket-list-no-results"
-        >
-          <div className="max-w-md mx-auto space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-gray-100 text-gray-400 mx-auto flex items-center justify-center">
-              <Search className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-semibold text-gray-900">
-              No matching tickets
-            </h3>
-            <p className="text-sm text-gray-500">
-              No tickets match your search query or selected filter criteria.
-            </p>
-            <div className="pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClearFilters}
-                data-testid="ticket-no-results-clear"
-              >
-                Clear all filters
-              </Button>
-            </div>
-          </div>
-        </Card>
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearFilters}
+              data-testid="ticket-no-results-clear"
+            >
+              Clear all filters
+            </Button>
+          }
+        />
       )}
 
       {/* 6. Tickets Table / List */}
       {!isLoading && !isError && tickets.length > 0 && (
         <Card padding="none" className="overflow-hidden">
           {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
-            <table
-              className="w-full text-left text-sm text-gray-600 divide-y divide-gray-200"
-              data-testid="ticket-table"
-            >
-              <thead className="bg-gray-50/75 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                <tr>
-                  <th scope="col" className="py-3.5 pl-6 pr-3">
-                    Ticket Details
-                  </th>
-                  <th scope="col" className="px-3 py-3.5">
-                    Status
-                  </th>
-                  <th scope="col" className="px-3 py-3.5">
-                    Priority
-                  </th>
-                  <th scope="col" className="px-3 py-3.5">
-                    Category
-                  </th>
-                  <th scope="col" className="px-3 py-3.5">
-                    Assignee
-                  </th>
-                  <th scope="col" className="px-3 py-3.5">
-                    Created
-                  </th>
-                  <th scope="col" className="py-3.5 pl-3 pr-6 text-right">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
-                {tickets.map((ticket) => (
-                  <tr
-                    key={ticket.id}
-                    onClick={() => navigate(`/tickets/${ticket.id}`)}
-                    className="hover:bg-gray-50/80 transition-colors cursor-pointer group"
-                    data-testid={`ticket-row-${ticket.id}`}
-                  >
-                    {/* Title & Description preview */}
-                    <td className="py-4 pl-6 pr-3 max-w-sm">
-                      <Link
-                        to={`/tickets/${ticket.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="font-semibold text-gray-900 group-hover:text-brand-600 transition-colors block truncate"
-                        data-testid={`ticket-title-${ticket.id}`}
-                      >
-                        {ticket.title}
-                      </Link>
-                      {ticket.description && (
-                        <p className="text-xs text-gray-500 truncate mt-0.5 max-w-xs">
-                          {ticket.description}
-                        </p>
-                      )}
-                    </td>
+          <Table containerClassName="hidden lg:block" data-testid="ticket-table">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="py-3.5 pl-6 pr-3">
+                  Ticket Details
+                </TableHead>
+                <TableHead>
+                  Status
+                </TableHead>
+                <TableHead>
+                  Priority
+                </TableHead>
+                <TableHead>
+                  Category
+                </TableHead>
+                <TableHead>
+                  Assignee
+                </TableHead>
+                <TableHead>
+                  Created
+                </TableHead>
+                <TableHead className="py-3.5 pl-3 pr-6 text-right">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tickets.map((ticket) => (
+                <TableRow
+                  key={ticket.id}
+                  isClickable
+                  onClick={() => navigate(`/tickets/${ticket.id}`)}
+                  className="group"
+                  data-testid={`ticket-row-${ticket.id}`}
+                >
+                  {/* Title & Description preview */}
+                  <TableCell className="py-4 pl-6 pr-3 max-w-sm">
+                    <Link
+                      to={`/tickets/${ticket.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="font-semibold text-gray-900 group-hover:text-brand-600 transition-colors block truncate"
+                      data-testid={`ticket-title-${ticket.id}`}
+                    >
+                      {ticket.title}
+                    </Link>
+                    {ticket.description && (
+                      <p className="text-xs text-gray-500 truncate mt-0.5 max-w-xs">
+                        {ticket.description}
+                      </p>
+                    )}
+                  </TableCell>
 
-                    {/* Status */}
-                    <td className="whitespace-nowrap px-3 py-4">
-                      <StatusBadge status={ticket.status} size="sm" />
-                    </td>
+                  {/* Status */}
+                  <TableCell className="whitespace-nowrap">
+                    <StatusBadge status={ticket.status} size="sm" />
+                  </TableCell>
 
-                    {/* Priority */}
-                    <td className="whitespace-nowrap px-3 py-4">
-                      <PriorityBadge priority={ticket.priority} size="sm" />
-                    </td>
+                  {/* Priority */}
+                  <TableCell className="whitespace-nowrap">
+                    <PriorityBadge priority={ticket.priority} size="sm" />
+                  </TableCell>
 
-                    {/* Category */}
-                    <td className="whitespace-nowrap px-3 py-4">
-                      {ticket.category ? (
-                        <Badge variant="neutral" size="sm">
-                          {ticket.category}
-                        </Badge>
-                      ) : (
-                        <span className="text-gray-400 text-xs">—</span>
-                      )}
-                    </td>
+                  {/* Category */}
+                  <TableCell className="whitespace-nowrap">
+                    {ticket.category ? (
+                      <Badge variant="neutral" size="sm">
+                        {ticket.category}
+                      </Badge>
+                    ) : (
+                      <span className="text-gray-400 text-xs">—</span>
+                    )}
+                  </TableCell>
 
-                    {/* Assignee (supported by API response) */}
-                    <td className="whitespace-nowrap px-3 py-4">
-                      {ticket.assignee ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-[10px] shrink-0">
-                            {ticket.assignee.name
-                              ? ticket.assignee.name.charAt(0).toUpperCase()
-                              : <UserIcon className="w-3 h-3" />}
-                          </div>
-                          <span
-                            className="text-xs font-medium text-gray-800 truncate max-w-[130px]"
-                            title={ticket.assignee.name || ticket.assignee.email}
-                          >
-                            {ticket.assignee.name || ticket.assignee.email}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400 italic">
-                          Unassigned
+                  {/* Assignee */}
+                  <TableCell className="whitespace-nowrap">
+                    {ticket.assignee ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar
+                          name={ticket.assignee.name || ticket.assignee.email}
+                          role="AGENT"
+                          size="xs"
+                        />
+                        <span
+                          className="text-xs font-medium text-gray-800 truncate max-w-[130px]"
+                          title={ticket.assignee.name || ticket.assignee.email}
+                        >
+                          {ticket.assignee.name || ticket.assignee.email}
                         </span>
-                      )}
-                    </td>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">
+                        Unassigned
+                      </span>
+                    )}
+                  </TableCell>
 
-                    {/* Created Date */}
-                    <td className="whitespace-nowrap px-3 py-4 text-xs text-gray-500">
-                      {formatTicketDate(ticket.createdAt)}
-                    </td>
+                  {/* Created Date */}
+                  <TableCell className="whitespace-nowrap text-xs text-gray-500">
+                    {formatTicketDate(ticket.createdAt)}
+                  </TableCell>
 
-                    {/* Action link */}
-                    <td className="whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs font-medium">
-                      <Link
-                        to={`/tickets/${ticket.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-brand-600 hover:text-brand-900 group-hover:underline inline-flex items-center gap-1"
-                        aria-label={`View ticket: ${ticket.title}`}
-                      >
-                        View &rarr;
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  {/* Action link */}
+                  <TableCell className="whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs font-medium">
+                    <Link
+                      to={`/tickets/${ticket.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-brand-600 hover:text-brand-900 group-hover:underline inline-flex items-center gap-1"
+                      aria-label={`View ticket: ${ticket.title}`}
+                    >
+                      View &rarr;
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
 
-          {/* Mobile Card List View */}
-          <div className="divide-y divide-gray-200 md:hidden">
+          {/* Mobile & Tablet Card List View (< lg) */}
+          <div className="divide-y divide-gray-200 lg:hidden">
             {tickets.map((ticket) => (
               <div
                 key={ticket.id}
@@ -459,7 +452,8 @@ export const TicketList: React.FC<TicketListProps> = ({ pageSize = 10 }) => {
                   <Link
                     to={`/tickets/${ticket.id}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="font-semibold text-sm text-gray-900 hover:text-brand-600 leading-snug"
+                    className="font-semibold text-sm text-gray-900 hover:text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 rounded transition-colors leading-snug"
+                    data-testid={`ticket-card-title-${ticket.id}`}
                   >
                     {ticket.title}
                   </Link>
@@ -482,11 +476,18 @@ export const TicketList: React.FC<TicketListProps> = ({ pageSize = 10 }) => {
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-gray-500 pt-1 border-t border-gray-100">
-                  <span>
+                  <span className="inline-flex items-center gap-1.5">
                     {ticket.assignee ? (
-                      <span className="font-medium text-gray-700">
-                        {ticket.assignee.name || ticket.assignee.email}
-                      </span>
+                      <>
+                        <Avatar
+                          name={ticket.assignee.name || ticket.assignee.email}
+                          role="AGENT"
+                          size="xs"
+                        />
+                        <span className="font-medium text-gray-700">
+                          {ticket.assignee.name || ticket.assignee.email}
+                        </span>
+                      </>
                     ) : (
                       <span className="italic text-gray-400">Unassigned</span>
                     )}

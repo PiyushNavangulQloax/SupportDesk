@@ -409,4 +409,25 @@ describe("TicketDetailPage Screen (Stage 4B)", () => {
       expect(screen.getByTestId("tickets-list-view")).toBeInTheDocument();
     });
   });
+
+  // 12. Shared component integration: Avatar and RoleBadge in comments and sidebar
+  it("renders shared Avatar and RoleBadge in comments and sidebar overview", async () => {
+    vi.spyOn(ticketsApi, "getTicketById").mockResolvedValue(mockTicket);
+    vi.spyOn(ticketsApi, "listComments").mockResolvedValue(mockComments);
+
+    renderTicketDetail();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("comments-count-badge")).toHaveTextContent("2");
+    });
+
+    // Sidebar avatars: Requester (Alex Customer -> "AC") and Assignee (Sarah Support -> "SS")
+    const sidebar = screen.getByTestId("ticket-sidebar");
+    expect(within(sidebar).getByLabelText("Alex Customer's avatar")).toHaveTextContent("AC");
+    expect(within(sidebar).getByLabelText("Sarah Support's avatar")).toHaveTextContent("SS");
+
+    // Comment avatars and role badges
+    expect(screen.getByTestId("comment-role-customer")).toHaveTextContent("CUSTOMER");
+    expect(screen.getByTestId("comment-role-agent")).toHaveTextContent("AGENT");
+  });
 });

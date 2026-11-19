@@ -4,19 +4,21 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
-  User as UserIcon,
-  Shield,
   MessageSquare,
   Send,
   AlertCircle,
-  Loader2,
   Lock,
   Tag,
   CheckCircle2,
+  Sparkles,
+  Check,
+  X,
 } from "lucide-react";
 import { useAuth } from "../../../lib/auth";
 import { useTicket } from "../hooks/useTicket";
 import { useComments, useCreateComment } from "../hooks/useComments";
+import { useUpdateTicket } from "../hooks/useTicketMutations";
+import { useAiCategorize, useAiSuggestReply } from "../hooks/useAi";
 import { StatusBadge } from "./StatusBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { Badge } from "../../../components/ui/Badge";
@@ -24,8 +26,13 @@ import { Button } from "../../../components/ui/Button";
 import { Textarea } from "../../../components/ui/Textarea";
 import { Card } from "../../../components/ui/Card";
 import { Alert } from "../../../components/ui/Alert";
+import { Avatar } from "../../../components/ui/Avatar";
+import { RoleBadge } from "../../../components/ui/RoleBadge";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { LoadingState } from "../../../components/ui/LoadingState";
 import { ApiError } from "../../../lib/api-client";
 import type { Comment } from "../types";
+import type { AiCategorizeResult } from "../api/ai.api";
 
 export function formatDateTime(isoDate?: string | null): string {
   if (!isoDate) return "—";
@@ -79,6 +86,73 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
   } = useComments(ticketId);
 
   const createCommentMutation = useCreateComment(ticketId || "");
+  const updateTicketMutation = useUpdateTicket(ticketId || "");
+
+  // AI Feature States & Hooks
+  const [pendingAiSuggestion, setPendingAiSuggestion] = useState<AiCategorizeResult | null>(null);
+  const [aiCategorizeError, setAiCategorizeError] = useState<string | null>(null);
+
+  const aiCategorizeMutation = useAiCategorize(ticketId);
+  const {
+    isStreaming: isAiStreaming,
+    error: aiStreamError,
+    startStreaming: startSuggestReply,
+    cancel: cancelSuggestReply,
+    resetError: resetStreamError,
+  } = useAiSuggestReply(ticketId);
+
+  const handleSuggestReply = () => {
+    resetStreamError();
+    let isFirstChunk = true;
+    startSuggestReply((chunk) => {
+      setCommentText((prev) => {
+        if (isFirstChunk) {
+          isFirstChunk = false;
+          if (prev.trim().length > 0) {
+            const separator = prev.endsWith("\n\n") ? "" : prev.endsWith("\n") ? "\n" : "\n\n";
+            return prev + separator + chunk;
+          }
+        }
+        return prev + chunk;
+      });
+      if (validationError) setValidationError("");
+    });
+  };
+
+  const handleAiCategorize = () => {
+    setAiCategorizeError(null);
+    aiCategorizeMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        setPendingAiSuggestion(data);
+      },
+      onError: (err) => {
+        setAiCategorizeError(err.message || "Failed to classify ticket.");
+      },
+    });
+  };
+
+  const handleApplyAiSuggestion = () => {
+    if (!pendingAiSuggestion) return;
+    setAiCategorizeError(null);
+    updateTicketMutation.mutate(
+      {
+        category: pendingAiSuggestion.category,
+        priority: pendingAiSuggestion.priority,
+      },
+      {
+        onSuccess: () => {
+          setPendingAiSuggestion(null);
+        },
+        onError: (err) => {
+          setAiCategorizeError(err.message || "Failed to update ticket.");
+        },
+      }
+    );
+  };
+
+  const handleDismissAiSuggestion = () => {
+    setPendingAiSuggestion(null);
+  };
 
   // Empty or invalid ticket ID
   if (!ticketId || ticketId.trim() === "") {
@@ -93,18 +167,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
           <ArrowLeft className="w-4 h-4" />
           <span>Back to tickets</span>
         </Button>
-        <Card className="text-center py-16 px-4 border-dashed border-2">
-          <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-          <h2 className="text-lg font-semibold text-gray-900">Invalid Ticket Identifier</h2>
-          <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
-            The requested ticket URL is missing a valid identifier.
-          </p>
-          <div className="mt-4">
+        <EmptyState
+          icon={<AlertCircle className="w-12 h-12 text-amber-500" />}
+          title="Invalid Ticket Identifier"
+          description="The requested ticket URL is missing a valid identifier."
+          isDashed
+          className="py-16"
+          action={
             <Button variant="outline" size="sm" onClick={() => navigate("/tickets")}>
               Return to tickets list
             </Button>
-          </div>
-        </Card>
+          }
+        />
       </div>
     );
   }
@@ -112,15 +186,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
   // Loading state
   if (isLoadingTicket) {
     return (
-      <div
-        className="flex flex-col items-center justify-center py-24 text-gray-500 gap-3"
-        role="status"
-        aria-live="polite"
+      <LoadingState
+        message="Loading ticket details..."
+        size="md"
+        asCard={false}
+        className="py-24"
         data-testid="ticket-detail-loading"
-      >
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
-        <p className="text-sm font-medium">Loading ticket details...</p>
-      </div>
+      />
     );
   }
 
@@ -141,18 +213,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
           <ArrowLeft className="w-4 h-4" />
           <span>Back to tickets</span>
         </Button>
-        <Card className="text-center py-16 px-4 border-dashed border-2">
-          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h2 className="text-lg font-semibold text-gray-900">Ticket Not Found</h2>
-          <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
-            We couldn't find the ticket you're looking for. It may have been removed or you may not have access to view it.
-          </p>
-          <div className="mt-4">
+        <EmptyState
+          icon={<AlertCircle className="w-12 h-12 text-gray-400" />}
+          title="Ticket Not Found"
+          description="We couldn't find the ticket you're looking for. It may have been removed or you may not have access to view it."
+          isDashed
+          className="py-16"
+          action={
             <Button variant="outline" size="sm" onClick={() => navigate("/tickets")}>
               Return to tickets list
             </Button>
-          </div>
-        </Card>
+          }
+        />
       </div>
     );
   }
@@ -283,12 +355,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
 
             {/* Comments Loading */}
             {isLoadingComments && (
-              <Card className="py-8 text-center" data-testid="comments-loading">
-                <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
-                  <span>Loading comments...</span>
-                </div>
-              </Card>
+              <LoadingState
+                message="Loading comments..."
+                size="sm"
+                asCard
+                className="py-8 text-center"
+                data-testid="comments-loading"
+              />
             )}
 
             {/* Comments Error */}
@@ -305,13 +378,14 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
 
             {/* Empty Comments State */}
             {!isLoadingComments && !isCommentsError && comments.length === 0 && (
-              <Card className="text-center py-10 px-4 border-dashed border-2" data-testid="comments-empty">
-                <MessageSquare className="w-8 h-8 text-gray-400 mx-auto mb-2 opacity-60" />
-                <p className="text-sm font-semibold text-gray-700">No comments yet</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Start the conversation by posting a reply below.
-                </p>
-              </Card>
+              <EmptyState
+                icon={<MessageSquare className="w-8 h-8 text-gray-400 opacity-60" />}
+                title="No comments yet"
+                description="Start the conversation by posting a reply below."
+                isDashed
+                className="py-10"
+                data-testid="comments-empty"
+              />
             )}
 
             {/* Comments Thread List */}
@@ -335,21 +409,12 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
                     >
                       <div className="flex items-start justify-between gap-3 mb-2.5">
                         <div className="flex items-center gap-2.5">
-                          <div
-                            className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
-                              isCommentInternal
-                                ? "bg-amber-200 text-amber-900"
-                                : authorRole === "AGENT"
-                                ? "bg-blue-100 text-blue-700"
-                                : authorRole === "ADMIN"
-                                ? "bg-purple-100 text-purple-700"
-                                : "bg-emerald-100 text-emerald-700"
-                            }`}
-                          >
-                            {comment.author?.name
-                              ? comment.author.name.charAt(0).toUpperCase()
-                              : <UserIcon className="w-3.5 h-3.5" />}
-                          </div>
+                          <Avatar
+                            name={comment.author?.name || comment.author?.email || "Support User"}
+                            role={isCommentInternal ? undefined : authorRole}
+                            size="sm"
+                            className={isCommentInternal ? "bg-amber-200 text-amber-900" : undefined}
+                          />
 
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
@@ -358,28 +423,23 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
                               </span>
 
                               {authorRole && (
-                                <span
-                                  className={`inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold border ${
-                                    authorRole === "ADMIN"
-                                      ? "bg-purple-50 text-purple-700 border-purple-200"
-                                      : authorRole === "AGENT"
-                                      ? "bg-blue-50 text-blue-700 border-blue-200"
-                                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  }`}
+                                <RoleBadge
+                                  role={authorRole}
+                                  size="sm"
                                   data-testid={`comment-role-${authorRole.toLowerCase()}`}
-                                >
-                                  {authorRole}
-                                </span>
+                                />
                               )}
 
                               {isCommentInternal && (
-                                <span
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                                <Badge
+                                  variant="warning"
+                                  size="sm"
+                                  className="gap-1 border-amber-300 bg-amber-100 text-amber-800"
                                   data-testid="internal-note-badge"
                                 >
                                   <Lock className="w-2.5 h-2.5" />
                                   Internal Note
-                                </span>
+                                </Badge>
                               )}
                             </div>
                           </div>
@@ -402,9 +462,56 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
             {/* Add Comment Card */}
             <Card className="p-5">
               <form onSubmit={handleCommentSubmit} className="space-y-3" data-testid="add-comment-form">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="ticket-comment-input" className="block text-sm font-semibold text-gray-900">
+                    Add a response
+                  </label>
+                  {isStaff && (
+                    <div className="flex items-center gap-2">
+                      {isAiStreaming ? (
+                        <div className="flex items-center gap-2" data-testid="suggest-reply-loading">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-indigo-600 font-medium">
+                            <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                            Streaming draft...
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={cancelSuggestReply}
+                            className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                            data-testid="suggest-reply-cancel-btn"
+                          >
+                            <X className="w-3 h-3 mr-1" />
+                            Stop
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSuggestReply}
+                          disabled={createCommentMutation.isPending}
+                          className="h-7 px-2.5 text-xs font-medium text-indigo-700 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300 gap-1.5"
+                          data-testid="suggest-reply-btn"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                          Suggest Reply
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {aiStreamError && (
+                  <Alert variant="error" className="py-2 text-xs" onClose={resetStreamError} data-testid="suggest-reply-error">
+                    <span>{aiStreamError}</span>
+                  </Alert>
+                )}
+
                 <Textarea
                   id="ticket-comment-input"
-                  label="Add a response"
                   placeholder="Type your response or update here..."
                   rows={4}
                   value={commentText}
@@ -492,17 +599,117 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
               </div>
             </div>
 
+            {/* AI Categorise & Priority Section (Staff Only) */}
+            {isStaff && (
+              <div className="pt-3 border-t border-gray-100 space-y-3" data-testid="ai-categorize-section">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    AI Triage
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAiCategorize}
+                    disabled={aiCategorizeMutation.isPending || updateTicketMutation.isPending}
+                    isLoading={aiCategorizeMutation.isPending}
+                    className="h-7 px-2.5 text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300 gap-1.5"
+                    data-testid="ai-categorize-btn"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                    AI Categorise
+                  </Button>
+                </div>
+
+                {/* AI Error Alert */}
+                {aiCategorizeError && (
+                  <Alert variant="error" className="py-2 text-xs" onClose={() => setAiCategorizeError(null)} data-testid="ai-categorize-error">
+                    <span>{aiCategorizeError}</span>
+                  </Alert>
+                )}
+
+                {/* AI Suggestion Proposal Card (Explicit Agent Approval Required) */}
+                {pendingAiSuggestion && (
+                  <div
+                    className="p-3.5 rounded-lg border border-indigo-200 bg-indigo-50/70 space-y-2.5 transition-all shadow-sm"
+                    data-testid="ai-suggestion-card"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-800 uppercase tracking-wide">
+                        <Sparkles className="w-3 h-3 text-indigo-600" />
+                        AI Suggestion
+                      </span>
+                      <span className="text-[10px] text-gray-500 italic">Pending Approval</span>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600 font-medium">Category:</span>
+                        <Badge variant="neutral" size="sm" data-testid="ai-suggested-category">
+                          {pendingAiSuggestion.category}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600 font-medium">Priority:</span>
+                        <div data-testid="ai-suggested-priority">
+                          <PriorityBadge priority={pendingAiSuggestion.priority} size="sm" />
+                        </div>
+                      </div>
+
+                      <div
+                        className="pt-1.5 border-t border-indigo-100 text-[11px] text-gray-700 leading-relaxed"
+                        data-testid="ai-suggested-reasoning"
+                      >
+                        <span className="font-semibold text-gray-800">Reasoning: </span>
+                        {pendingAiSuggestion.reasoning}
+                      </div>
+                    </div>
+
+                    {/* Agent Approval Actions */}
+                    <div className="pt-2 flex items-center justify-end gap-2 border-t border-indigo-100">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDismissAiSuggestion}
+                        disabled={updateTicketMutation.isPending}
+                        className="h-7 px-2 text-xs text-gray-600 hover:text-gray-900"
+                        data-testid="dismiss-ai-suggestion-btn"
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        Dismiss
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={handleApplyAiSuggestion}
+                        isLoading={updateTicketMutation.isPending}
+                        disabled={updateTicketMutation.isPending}
+                        className="h-7 px-2.5 text-xs gap-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+                        data-testid="apply-ai-suggestion-btn"
+                      >
+                        <Check className="w-3 h-3" />
+                        Apply Suggestion
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* People (Requester & Assignee) */}
             <div className="pt-3 border-t border-gray-100 space-y-3">
               <div>
                 <span className="block text-xs font-medium text-gray-500 mb-1">Customer / Requester</span>
                 {ticket.createdBy ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-xs shrink-0">
-                      {ticket.createdBy.name
-                        ? ticket.createdBy.name.charAt(0).toUpperCase()
-                        : <UserIcon className="w-3.5 h-3.5" />}
-                    </div>
+                    <Avatar
+                      name={ticket.createdBy.name || ticket.createdBy.email}
+                      role="CUSTOMER"
+                      size="sm"
+                    />
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-gray-900 truncate" title={ticket.createdBy.name}>
                         {ticket.createdBy.name}
@@ -521,11 +728,11 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
                 <span className="block text-xs font-medium text-gray-500 mb-1">Assigned Agent</span>
                 {ticket.assignee ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
-                      {ticket.assignee.name
-                        ? ticket.assignee.name.charAt(0).toUpperCase()
-                        : <Shield className="w-3.5 h-3.5" />}
-                    </div>
+                    <Avatar
+                      name={ticket.assignee.name || ticket.assignee.email}
+                      role="AGENT"
+                      size="sm"
+                    />
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-gray-900 truncate" title={ticket.assignee.name}>
                         {ticket.assignee.name}
@@ -581,4 +788,3 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId: propTicket
     </div>
   );
 };
-

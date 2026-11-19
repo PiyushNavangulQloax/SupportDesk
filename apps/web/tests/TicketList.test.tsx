@@ -461,5 +461,123 @@ describe("TicketList Screen (Stage 4A)", () => {
       expect(screen.getByTestId("ticket-detail-view")).toBeInTheDocument();
     });
   });
+
+  // 12. Keyboard navigation on table rows
+  it("navigates to /tickets/:id when pressing Enter on a focused table row", async () => {
+    vi.spyOn(ticketsApi, "listTickets").mockResolvedValue({
+      tickets: [mockTickets[0]],
+      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+    });
+
+    renderTicketList();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ticket-row-ticket-1")).toBeInTheDocument();
+    });
+
+    const row = screen.getByTestId("ticket-row-ticket-1");
+    expect(row).toHaveAttribute("tabindex", "0");
+
+    fireEvent.keyDown(row, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ticket-detail-view")).toBeInTheDocument();
+    });
+  });
+
+  // 13. Accessibility and shared component integration
+  it("renders accessible search input, clear button, and assignee Avatar initials", async () => {
+    vi.spyOn(ticketsApi, "listTickets").mockResolvedValue({
+      tickets: [mockTickets[0]],
+      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+    });
+
+    renderTicketList();
+
+    // Accessible search input
+    const searchInput = screen.getByRole("textbox", { name: /search tickets/i });
+    expect(searchInput).toBeInTheDocument();
+
+    // Type query to show clear button
+    fireEvent.change(searchInput, { target: { value: "VPN" } });
+    const clearBtn = screen.getByRole("button", { name: /clear search input/i });
+    expect(clearBtn).toBeInTheDocument();
+
+    // Shared Avatar rendered for Sam Agent ("SA") in both desktop table and mobile card
+    await waitFor(() => {
+      const avatars = screen.getAllByLabelText("Sam Agent's avatar");
+      expect(avatars.length).toBeGreaterThanOrEqual(1);
+      expect(avatars[0]).toHaveTextContent("SA");
+    });
+  });
+
+  // 14. Responsive viewport breakpoint configuration (Step 5B)
+  it("configures table for lg+ viewports and cards for below-lg viewports", async () => {
+    vi.spyOn(ticketsApi, "listTickets").mockResolvedValue({
+      tickets: mockTickets,
+      pagination: { page: 1, limit: 10, total: 3, totalPages: 1 },
+    });
+
+    renderTicketList();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ticket-table")).toBeInTheDocument();
+    });
+
+    // Table container is hidden below lg and visible at lg+
+    const tableElement = screen.getByTestId("ticket-table");
+    const tableContainer = tableElement.parentElement;
+    expect(tableContainer).toHaveClass("hidden", "lg:block");
+
+    // Card container is visible below lg and hidden at lg+
+    const firstCard = screen.getByTestId("ticket-card-ticket-1");
+    const cardContainer = firstCard.parentElement;
+    expect(cardContainer).toHaveClass("lg:hidden");
+  });
+
+  // 15. Level-one heading accessibility (Step 6B)
+  it("renders a meaningful level-one Tickets heading (h1)", async () => {
+    vi.spyOn(ticketsApi, "listTickets").mockResolvedValue({
+      tickets: mockTickets,
+      pagination: { page: 1, limit: 10, total: 3, totalPages: 1 },
+    });
+
+    renderTicketList();
+
+    const heading = screen.getByRole("heading", { level: 1, name: "Tickets" });
+    expect(heading).toBeInTheDocument();
+    expect(heading).toHaveAttribute("data-testid", "ticket-list-heading");
+  });
+
+  // 16. Mobile ticket card keyboard accessibility (Step 6B)
+  it("ensures mobile ticket title link is keyboard accessible without redundant tab stops", async () => {
+    vi.spyOn(ticketsApi, "listTickets").mockResolvedValue({
+      tickets: [mockTickets[0]],
+      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+    });
+
+    renderTicketList();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ticket-card-ticket-1")).toBeInTheDocument();
+    });
+
+    // The outer card container should NOT have a redundant tabIndex
+    const cardContainer = screen.getByTestId("ticket-card-ticket-1");
+    expect(cardContainer).not.toHaveAttribute("tabindex");
+
+    // The inner title link is the single keyboard navigation anchor
+    const titleLink = screen.getByTestId("ticket-card-title-ticket-1");
+    expect(titleLink).toBeInTheDocument();
+    expect(titleLink.tagName.toLowerCase()).toBe("a");
+    expect(titleLink).toHaveAttribute("href", "/tickets/ticket-1");
+
+    // Clicking the title link stops propagation
+    fireEvent.click(titleLink);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ticket-detail-view")).toBeInTheDocument();
+    });
+  });
 });
 

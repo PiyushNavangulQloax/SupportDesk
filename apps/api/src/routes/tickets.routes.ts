@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { ticketsController } from "../controllers/tickets.controller.js";
 import { commentsRouter } from "./comments.routes.js";
+import { aiRouter } from "./ai.routes.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { authenticate, authorize, UserRole } from "../middleware/auth.middleware.js";
 import {
@@ -17,6 +18,9 @@ ticketsRouter.use(authenticate);
 
 // Mount comments nested router
 ticketsRouter.use("/:ticketId/comments", commentsRouter);
+
+// Mount AI features nested router
+ticketsRouter.use("/:id/ai", aiRouter);
 
 ticketsRouter.get(
   "/",

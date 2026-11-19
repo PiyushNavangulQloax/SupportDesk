@@ -53,3 +53,12 @@ export class ForbiddenError extends AppError {
     super(message, 403, "FORBIDDEN", details);
   }
 }
+
+export class AiServiceUnavailableError extends AppError {
+  constructor(
+    message = "AI service is currently unavailable: GEMINI_API_KEY is not configured",
+    details?: unknown
+  ) {
+    super(message, 503, "AI_SERVICE_UNAVAILABLE", details);
+  }
+}
