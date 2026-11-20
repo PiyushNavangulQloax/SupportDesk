@@ -11,6 +11,14 @@ export const envSchema = z
     JWT_EXPIRES_IN: z.string().min(1, "JWT_EXPIRES_IN cannot be empty").default("1d"),
     CORS_ORIGIN: z.string().min(1, "CORS_ORIGIN cannot be empty").default("http://localhost:5173"),
 
+    // Redis Configuration
+    REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
+
+    // Structured Logging Configuration
+    LOG_LEVEL: z
+      .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+      .default("info"),
+
     // Google Gemini AI Configuration (Backend Only)
     GEMINI_API_KEY: z.string().trim().optional(),
     AI_MODEL: z.string().trim().min(1).default("gemini-3.5-flash-lite"),

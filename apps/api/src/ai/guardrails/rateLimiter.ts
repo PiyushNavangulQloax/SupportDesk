@@ -1,17 +1,20 @@
 import type { Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
+import { createDistributedRateLimitStore } from "../../config/redis.js";
 
 /**
  * SupportDesk AI Guardrails - Per-User Rate Limiter
  *
  * Restricts AI endpoint calls to prevent model abuse, runaway loops, and denial of wallet.
  * Default: 10 requests per minute per authenticated user.
+ * Backed by distributed Redis store when configured/in production.
  */
 export const aiRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
   max: 10, // Max 10 requests per window
   standardHeaders: true, // Draft-6 RateLimit headers (RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset)
   legacyHeaders: false, // Disable X-RateLimit-* headers
+  store: createDistributedRateLimitStore("rl:ai:"),
   validate: { keyGeneratorIpFallback: false },
   keyGenerator: (req: Request): string => {
     // Rate limit per authenticated user; fallback to IP if not logged in
