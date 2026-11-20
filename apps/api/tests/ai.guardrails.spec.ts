@@ -25,6 +25,7 @@ import { AiService, AI_SAFE_FALLBACK_MESSAGE } from "../src/ai/ai.service.js";
 import { GeminiClient } from "../src/ai/gemini.client.js";
 import { generateToken } from "../src/utils/jwt.js";
 import { UserRole } from "../src/generated/prisma/enums.js";
+import { AppError } from "../src/errors/appError.js";
 
 describe("Day 17 — AI Guardrails Specification", () => {
   // =========================================================================
@@ -87,6 +88,128 @@ describe("Day 17 — AI Guardrails Specification", () => {
       expect(result.piiDetected).toBe(false);
       expect(result.maskedText).toBe(clean);
     });
+
+    it("redacts Indian PAN numbers with [PAN_REDACTED]", () => {
+      const input = "Customer PAN is ABCDE1234F for identity verification or lowercase abcde5678g";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(true);
+      expect(result.detectedTypes).toContain("PAN");
+      expect(result.maskedText).toBe("Customer PAN is [PAN_REDACTED] for identity verification or lowercase [PAN_REDACTED]");
+    });
+
+    it("redacts Indian Aadhaar numbers in 4-4-4, hyphenated, and contiguous formats with [AADHAAR_REDACTED]", () => {
+      const input = "Aadhaar numbers: 3456 7890 1234, 4567-8901-2345, and 987654321012";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(true);
+      expect(result.detectedTypes).toContain("AADHAAR");
+      expect(result.maskedText).toBe("Aadhaar numbers: [AADHAAR_REDACTED], [AADHAAR_REDACTED], and [AADHAAR_REDACTED]");
+    });
+
+    it("redacts Indian bank account numbers with contextual labels as [ACCOUNT_REDACTED]", () => {
+      const input = "Refund to Account number: 1234567890123456 or A/C # 98765432109 or Bank a/c no 112233445566";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(true);
+      expect(result.detectedTypes).toContain("BANK_ACCOUNT");
+      expect(result.maskedText).toBe("Refund to Account number: [ACCOUNT_REDACTED] or A/C # [ACCOUNT_REDACTED] or Bank a/c no [ACCOUNT_REDACTED]");
+    });
+
+    it("redacts Indian mobile phone numbers with +91, 0, or 10-digit formats with [PHONE_REDACTED]", () => {
+      const input = "Call me on +91 98765 43210 or +91-9876543210 or 9876543210 or 09876543210";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(true);
+      expect(result.detectedTypes).toContain("PHONE");
+      expect(result.maskedText).toBe("Call me on [PHONE_REDACTED] or [PHONE_REDACTED] or [PHONE_REDACTED] or [PHONE_REDACTED]");
+    });
+
+    it("does NOT produce false positives on ticket UUIDs, IDs, status codes, dates, or prices", () => {
+      const input = "Ticket UUID 00000000-0000-0000-0000-000000000001 with Ticket #12345 returned HTTP 500 on port 5432 on 2026-11-25. Cost is $100 or Rs. 1500 for 50 items.";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(false);
+      expect(result.maskedText).toBe(input);
+    });
+  });
+
+  // =========================================================================
+  // 1b. PII Regex Collision & Regression Suite (Step 3B)
+  // =========================================================================
+  describe("PII Regex Collision & Regression Suite (Step 3B)", () => {
+    it("1. correctly detects and redacts valid Indian mobile numbers in all standard formats", () => {
+      const input = "Contact: +91 98765 43210 or +91-9876543210 or 9876543210 or 09876543210";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(true);
+      expect(result.detectedTypes).toContain("PHONE");
+      expect(result.maskedText).toBe("Contact: [PHONE_REDACTED] or [PHONE_REDACTED] or [PHONE_REDACTED] or [PHONE_REDACTED]");
+    });
+
+    it("2. does NOT partially match phone-like digits embedded inside longer numeric identifiers", () => {
+      const input = "Tracking ID 123459876543210 and serial number 99987654321012 are in transit.";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(false);
+      expect(result.maskedText).toBe(input);
+      expect(result.maskedText).not.toContain("[PHONE_REDACTED]");
+    });
+
+    it("3. detects and redacts valid Aadhaar numbers in contiguous, 4-4-4 spaced, and hyphenated formats", () => {
+      const input = "Aadhaar IDs: 345678901234, 3456 7890 1234, and 3456-7890-1234";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(true);
+      expect(result.detectedTypes).toContain("AADHAAR");
+      expect(result.maskedText).toBe("Aadhaar IDs: [AADHAAR_REDACTED], [AADHAAR_REDACTED], and [AADHAAR_REDACTED]");
+    });
+
+    it("4. does NOT falsely mask ordinary 12-digit reference numbers that do not match Aadhaar format", () => {
+      const input = "Order reference REF-123456789012 or batch 012345678901 or code REF987654321012";
+      const result = maskPii(input);
+      expect(result.detectedTypes).not.toContain("AADHAAR");
+      expect(result.maskedText).toBe(input);
+    });
+
+    it("5. correctly prioritizes context-labelled bank account numbers over generic credit card numbers", () => {
+      const input = "Dispute for Account number: 1234567890123456 and A/C # 98765432109";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(true);
+      expect(result.detectedTypes).toContain("BANK_ACCOUNT");
+      expect(result.detectedTypes).not.toContain("CREDIT_CARD");
+      expect(result.maskedText).toBe("Dispute for Account number: [ACCOUNT_REDACTED] and A/C # [ACCOUNT_REDACTED]");
+    });
+
+    it("6. preserves unlabelled numeric references that lack bank account contextual keywords", () => {
+      const input = "Unlabelled tracking numbers: 12345678901234 and 98765432109 without keyword.";
+      const result = maskPii(input);
+      expect(result.detectedTypes).not.toContain("BANK_ACCOUNT");
+      expect(result.maskedText).toBe(input);
+    });
+
+    it("7. correctly redacts genuine credit/debit card numbers", () => {
+      const input = "Paid with card 4111-2222-3333-4444 or 4111 2222 3333 4444";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(true);
+      expect(result.detectedTypes).toContain("CREDIT_CARD");
+      expect(result.maskedText).toBe("Paid with card [CARD_REDACTED] or [CARD_REDACTED]");
+    });
+
+    it("8. preserves standard UUIDs with zero corruption or false-positive phone/card detection", () => {
+      const input = "Ticket 550e8400-e29b-41d4-a716-446655440000 and user 00000000-0000-0000-0000-000000000001";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(false);
+      expect(result.maskedText).toBe(input);
+    });
+
+    it("9. preserves ticket IDs, dates, HTTP status codes, ports, and prices", () => {
+      const input = "Ticket #12345 has HTTP 500 on port 5432. Date: 2026-11-25. Fee: $100 or Rs. 1500 for 5 items.";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(false);
+      expect(result.maskedText).toBe(input);
+    });
+
+    it("10. faithfully preserves text and punctuation surrounding masked values", () => {
+      const input = "Please refund to account: 123456789012 immediately, or call +91 98765 43210 before 5 PM!";
+      const result = maskPii(input);
+      expect(result.piiDetected).toBe(true);
+      expect(result.detectedTypes).toContain("BANK_ACCOUNT");
+      expect(result.detectedTypes).toContain("PHONE");
+      expect(result.maskedText).toBe("Please refund to account: [ACCOUNT_REDACTED] immediately, or call [PHONE_REDACTED] before 5 PM!");
+    });
   });
 
   // =========================================================================
@@ -119,6 +242,220 @@ describe("Day 17 — AI Guardrails Specification", () => {
       const mod = moderateContent(complaint);
       expect(mod.isSafe).toBe(true);
       expect(mod.flaggedCategories).toHaveLength(0);
+    });
+  });
+
+  // =========================================================================
+  // 2b. Comment Moderation Guardrails in Suggest Reply
+  // =========================================================================
+  describe("Comment Moderation Guardrails in Suggest Reply", () => {
+    const sampleTicket: any = {
+      id: "ticket-mod-1",
+      title: "Help with invoice",
+      description: "Need help reviewing my invoice",
+      priority: "P3",
+      status: "OPEN",
+      createdBy: { name: "Safe Customer" },
+    };
+    const agentUser: any = { id: "u-1", email: "agent@corp.com", role: "AGENT" };
+
+    it("1. allows safe comments and proceeds to AI provider", async () => {
+      const mockTicketsRepo: any = {
+        findById: jest.fn().mockResolvedValue(sampleTicket),
+      };
+      const mockCommentsRepo: any = {
+        findByTicketId: jest.fn().mockResolvedValue([
+          { id: "c-1", body: "I checked the invoice and noticed an itemized line." },
+          { id: "c-2", body: "Can someone check this with billing?" },
+        ]),
+      };
+      const mockClient: any = {
+        model: "gemini-3.5-flash-lite",
+        generateContentStream: jest.fn().mockResolvedValue((async function* () {
+          yield { text: "Hello, we can help with your invoice." };
+        })()),
+      };
+
+      const service = new AiService(mockClient, mockTicketsRepo, mockCommentsRepo);
+      const handle = await service.suggestReplyStream(sampleTicket.id, agentUser);
+
+      expect(handle).toBeDefined();
+      expect(mockClient.generateContentStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("2. blocks violent threat in comment and never invokes AI provider", async () => {
+      const mockTicketsRepo: any = {
+        findById: jest.fn().mockResolvedValue(sampleTicket),
+      };
+      const mockCommentsRepo: any = {
+        findByTicketId: jest.fn().mockResolvedValue([
+          { id: "c-1", body: "I will kill your staff if this is not resolved today" },
+        ]),
+      };
+      const mockClient: any = {
+        model: "gemini-3.5-flash-lite",
+        generateContentStream: jest.fn(),
+      };
+
+      const service = new AiService(mockClient, mockTicketsRepo, mockCommentsRepo);
+
+      try {
+        await service.suggestReplyStream(sampleTicket.id, agentUser);
+        throw new Error("Expected call to throw");
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(AppError);
+        expect(err.statusCode).toBe(400);
+        expect(err.code).toBe("AI_CONTENT_MODERATION_BLOCKED");
+        expect(err.message).toBe(AI_SAFE_FALLBACK_MESSAGE);
+        expect(err.details.flagged).toContain("VIOLENCE_THREATS");
+        // Verify customer comment text is not exposed in error details
+        expect(JSON.stringify(err.details)).not.toContain("I will kill");
+      }
+
+      // Crucial verification: blocked content never reaches the AI provider
+      expect(mockClient.generateContentStream).not.toHaveBeenCalled();
+    });
+
+    it("3. handles self-harm content in comment with moderation policy and never invokes AI provider", async () => {
+      const mockTicketsRepo: any = {
+        findById: jest.fn().mockResolvedValue(sampleTicket),
+      };
+      const mockCommentsRepo: any = {
+        findByTicketId: jest.fn().mockResolvedValue([
+          { id: "c-1", body: "I am going to commit suicide if my account is not unlocked" },
+        ]),
+      };
+      const mockClient: any = {
+        model: "gemini-3.5-flash-lite",
+        generateContentStream: jest.fn(),
+      };
+
+      const service = new AiService(mockClient, mockTicketsRepo, mockCommentsRepo);
+
+      await expect(
+        service.suggestReplyStream(sampleTicket.id, agentUser)
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        code: "AI_CONTENT_MODERATION_BLOCKED",
+        details: expect.objectContaining({
+          flagged: expect.arrayContaining(["SELF_HARM"]),
+        }),
+      });
+
+      expect(mockClient.generateContentStream).not.toHaveBeenCalled();
+    });
+
+    it("4. blocks script injection in comment and never invokes AI provider", async () => {
+      const mockTicketsRepo: any = {
+        findById: jest.fn().mockResolvedValue(sampleTicket),
+      };
+      const mockCommentsRepo: any = {
+        findByTicketId: jest.fn().mockResolvedValue([
+          { id: "c-1", body: "Check my attached log <script>alert('xss')</script>" },
+        ]),
+      };
+      const mockClient: any = {
+        model: "gemini-3.5-flash-lite",
+        generateContentStream: jest.fn(),
+      };
+
+      const service = new AiService(mockClient, mockTicketsRepo, mockCommentsRepo);
+
+      await expect(
+        service.suggestReplyStream(sampleTicket.id, agentUser)
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        code: "AI_CONTENT_MODERATION_BLOCKED",
+        details: expect.objectContaining({
+          flagged: expect.arrayContaining(["MALICIOUS_INJECTION_CODE"]),
+        }),
+      });
+
+      expect(mockClient.generateContentStream).not.toHaveBeenCalled();
+    });
+
+    it("5. handles empty comments without error and proceeds safely", async () => {
+      const mockTicketsRepo: any = {
+        findById: jest.fn().mockResolvedValue(sampleTicket),
+      };
+      const mockCommentsRepo: any = {
+        findByTicketId: jest.fn().mockResolvedValue([
+          { id: "c-1", body: "" },
+          { id: "c-2", body: "   " },
+          { id: "c-3", body: null as any },
+        ]),
+      };
+      const mockClient: any = {
+        model: "gemini-3.5-flash-lite",
+        generateContentStream: jest.fn().mockResolvedValue((async function* () {
+          yield { text: "Reply draft." };
+        })()),
+      };
+
+      const service = new AiService(mockClient, mockTicketsRepo, mockCommentsRepo);
+      const handle = await service.suggestReplyStream(sampleTicket.id, agentUser);
+
+      expect(handle).toBeDefined();
+      expect(mockClient.generateContentStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("6. checks multiple comments and blocks if any one contains unsafe content", async () => {
+      const mockTicketsRepo: any = {
+        findById: jest.fn().mockResolvedValue(sampleTicket),
+      };
+      const mockCommentsRepo: any = {
+        findByTicketId: jest.fn().mockResolvedValue([
+          { id: "c-1", body: "First benign message." },
+          { id: "c-2", body: "Second benign message." },
+          { id: "c-3", body: "Third benign message." },
+          { id: "c-4", body: "I will bomb your office if you don't answer." },
+          { id: "c-5", body: "Fifth benign message." },
+        ]),
+      };
+      const mockClient: any = {
+        model: "gemini-3.5-flash-lite",
+        generateContentStream: jest.fn(),
+      };
+
+      const service = new AiService(mockClient, mockTicketsRepo, mockCommentsRepo);
+
+      await expect(
+        service.suggestReplyStream(sampleTicket.id, agentUser)
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        code: "AI_CONTENT_MODERATION_BLOCKED",
+      });
+
+      expect(mockClient.generateContentStream).not.toHaveBeenCalled();
+    });
+
+    it("7. verifies existing safe ticket categorization continues to work properly", async () => {
+      const mockTicketsRepo: any = {
+        findById: jest.fn().mockResolvedValue({
+          id: "ticket-cat-1",
+          title: "VPN connection dropping repeatedly",
+          description: "My corporate VPN disconnects every 5 minutes on macOS.",
+          priority: "P3",
+          status: "OPEN",
+        }),
+      };
+      const mockClient: any = {
+        model: "gemini-3.5-flash-lite",
+        generateContent: jest.fn().mockResolvedValue({
+          text: JSON.stringify({
+            category: "Technical",
+            priority: "P3",
+            reasoning: "VPN client instability is a standard technical issue.",
+          }),
+        }),
+      };
+
+      const service = new AiService(mockClient, mockTicketsRepo, {} as any);
+      const result = await service.categorizeTicket("ticket-cat-1", agentUser);
+
+      expect(result.data.category).toBe("Technical");
+      expect(result.data.priority).toBe("P3");
+      expect(mockClient.generateContent).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -199,6 +536,44 @@ describe("Day 17 — AI Guardrails Specification", () => {
       expect(prompt).toContain("[EMAIL_REDACTED]");
       expect(prompt).toContain("[PHONE_REDACTED]");
       expect(prompt).toContain("[IP_REDACTED]");
+    });
+
+    it("applies Indian personal and financial identifier masking inside prompt construction", () => {
+      const ticket: any = {
+        id: "T-05",
+        title: "KYC verification for PAN ABCDE1234F",
+        description: "Customer Aadhaar 3456 7890 1234, bank a/c no 1234567890123456, phone +91 98765 43210",
+        createdBy: { name: "Rajesh Kumar" },
+      };
+      const publicComments: any[] = [
+        {
+          id: "C-1",
+          author: { name: "Pooja Sharma", role: "CUSTOMER" },
+          body: "Sending updated PAN: FGHIJ5678K and alternate phone 9876543210 for verification.",
+        },
+      ];
+
+      const categorizePrompt = buildCategorizePrompt({ ticket });
+      expect(categorizePrompt).not.toContain("ABCDE1234F");
+      expect(categorizePrompt).not.toContain("3456 7890 1234");
+      expect(categorizePrompt).not.toContain("1234567890123456");
+      expect(categorizePrompt).not.toContain("+91 98765 43210");
+      expect(categorizePrompt).toContain("[PAN_REDACTED]");
+      expect(categorizePrompt).toContain("[AADHAAR_REDACTED]");
+      expect(categorizePrompt).toContain("[ACCOUNT_REDACTED]");
+      expect(categorizePrompt).toContain("[PHONE_REDACTED]");
+
+      const suggestPrompt = buildSuggestReplyPrompt({
+        ticket,
+        publicComments,
+        agentInstructions: "Please check account 998877665544.",
+      });
+      expect(suggestPrompt).not.toContain("FGHIJ5678K");
+      expect(suggestPrompt).not.toContain("9876543210");
+      expect(suggestPrompt).not.toContain("998877665544");
+      expect(suggestPrompt).toContain("[PAN_REDACTED]");
+      expect(suggestPrompt).toContain("[PHONE_REDACTED]");
+      expect(suggestPrompt).toContain("[ACCOUNT_REDACTED]");
     });
   });
 

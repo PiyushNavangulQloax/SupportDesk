@@ -17,6 +17,7 @@ import {
   buildSuggestReplyPrompt,
   SUGGEST_REPLY_SYSTEM_INSTRUCTION,
   SUGGEST_REPLY_PROMPT_VERSION,
+  MAX_COMMENT_LENGTH,
 } from "./prompts/suggestReply.prompt.js";
 import {
   buildCategorizePrompt,
@@ -115,8 +116,18 @@ export class AiService {
       throw new NotFoundError("Ticket not found");
     }
 
-    // Guardrail: Content moderation check on input
-    const textToModerate = `${ticket.title} ${ticket.description} ${instructions || ""}`;
+    // Retrieve latest public comments only (includeInternal = false)
+    const allPublicComments = await this.commentsRepo.findByTicketId(
+      ticketId,
+      false
+    );
+    const latestFivePublicComments = (allPublicComments || []).slice(-5);
+
+    // Guardrail: Content moderation check on input (title, description, instructions, and customer comments)
+    const commentsText = latestFivePublicComments
+      .map((c) => (c?.body || "").slice(0, MAX_COMMENT_LENGTH))
+      .join(" ");
+    const textToModerate = `${ticket.title || ""} ${ticket.description || ""} ${instructions || ""} ${commentsText}`;
     const moderation = moderateContent(textToModerate);
     if (!moderation.isSafe) {
       logAiUsage({
@@ -135,13 +146,6 @@ export class AiService {
         { reason: moderation.reason, flagged: moderation.flaggedCategories }
       );
     }
-
-    // Retrieve latest public comments only (includeInternal = false)
-    const allPublicComments = await this.commentsRepo.findByTicketId(
-      ticketId,
-      false
-    );
-    const latestFivePublicComments = allPublicComments.slice(-5);
 
     const prompt = buildSuggestReplyPrompt({
       ticket,
