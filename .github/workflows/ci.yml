@@ -1,0 +1,127 @@
+name: SupportDesk CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "feat/**"
+  pull_request:
+    branches:
+      - main
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: Code Quality & Automated Test Suites
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: supportdesk_user
+          POSTGRES_PASSWORD: supportdesk_dev_password
+          POSTGRES_DB: supportdesk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U supportdesk_user -d supportdesk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      PORT: 5000
+      DATABASE_URL: "postgresql://supportdesk_user:supportdesk_dev_password@localhost:5432/supportdesk?schema=public"
+      TEST_DATABASE_URL: "postgresql://supportdesk_user:supportdesk_dev_password@localhost:5432/supportdesk_test?schema=public"
+      REDIS_URL: "redis://localhost:6379"
+      JWT_SECRET: "supportdesk_ci_testing_secret_key_minimum_32_characters_long"
+      JWT_EXPIRES_IN: "1d"
+      CORS_ORIGIN: "http://localhost:5173"
+      AI_MODEL: "gemini-3.5-flash-lite"
+      AI_MAX_OUTPUT_TOKENS: 1000
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Set up Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: |
+            apps/api/package-lock.json
+            apps/web/package-lock.json
+
+      - name: 3. Install Backend Dependencies
+        run: npm --prefix apps/api ci --legacy-peer-deps
+
+      - name: 4. Install Frontend Dependencies
+        run: npm --prefix apps/web ci --legacy-peer-deps
+
+      - name: 5. Frontend Typecheck
+        run: npm --prefix apps/web run typecheck
+
+      - name: 6. Backend Typecheck
+        run: npm --prefix apps/api run typecheck
+
+      - name: 7. Frontend Vitest Suite
+        run: npm --prefix apps/web test
+
+      - name: 8. Backend AI Guardrails & Unit Tests
+        run: npm --prefix apps/api run test:jest -- tests/ai.guardrails.spec.ts tests/ai.feature.spec.ts tests/gemini.client.spec.ts tests/ai.evaluation.spec.ts tests/docs.spec.ts
+
+      - name: 9. Initialize CI Test Database
+        run: |
+          PGPASSWORD=supportdesk_dev_password psql -h localhost -U supportdesk_user -d supportdesk -c "CREATE DATABASE supportdesk_test;" || true
+          npx --prefix apps/api prisma migrate deploy
+          DATABASE_URL="$TEST_DATABASE_URL" npx --prefix apps/api prisma migrate deploy
+
+      - name: 10. Backend PostgreSQL Integration Tests
+        run: |
+          npm --prefix apps/api run test:node
+          npm --prefix apps/api run test:jest -- tests/integration.spec.ts
+
+      - name: 11. Frontend Production Build
+        run: npm --prefix apps/web run build
+
+      - name: 12. Backend Production Build
+        run: npm --prefix apps/api run build
+
+  docker-verification:
+    name: Docker Build & Compose Verification
+    runs-on: ubuntu-latest
+    needs: quality-gate
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 3. Verify Docker Compose Configuration
+        run: docker compose config
+
+      - name: 4. Build API Docker Image
+        run: docker build -t supportdesk-api:ci ./apps/api
+
+      - name: 5. Build Web Docker Image
+        run: docker build -t supportdesk-web:ci -f apps/web/Dockerfile .

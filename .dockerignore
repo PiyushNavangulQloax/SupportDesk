@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+.git
+.github
+docs
+coverage
+supportdesk_messy_express_demo.js
