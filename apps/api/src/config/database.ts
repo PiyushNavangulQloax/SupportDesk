@@ -2,6 +2,7 @@ import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client.js";
 import { env } from "./env.js";
+import { disconnectRedis } from "./redis.js";
 
 export function resolveDatabaseUrl(
   nodeEnv = process.env.NODE_ENV,
@@ -45,6 +46,12 @@ export async function disconnectDatabase(): Promise<void> {
     if (!disconnectError) {
       disconnectError = err;
     }
+  }
+
+  try {
+    await disconnectRedis();
+  } catch {
+    // Non-blocking fallback for redis disconnect in tests
   }
 
   if (disconnectError) {
